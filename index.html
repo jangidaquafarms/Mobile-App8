@@ -4,6 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Shrimp Farm Management - Farm Hub</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <script src="https://cdn.tailwindcss.com"></script>
 
     <!-- Firebase Compat Libraries for Direct Browser Sync & Auth -->
@@ -46,10 +49,10 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Farm Hub">
-    <link rel="apple-touch-icon" href="icon.png">
-    <link rel="icon" type="image/png" href="icon.png">
+    <link rel="apple-touch-icon" href="icon.png?v=1.0">
+    <link rel="icon" type="image/png" href="icon.png?v=1.0">
 </head>
-<body class="bg-slate-50 font-sans h-screen flex flex-col overflow-hidden">
+<body class="bg-slate-50 font-sans h-[100dvh] flex flex-col overflow-hidden pt-[env(safe-area-inset-top)]">
 
     <!-- Startup Loading Screen (Prevents PIN flash if already logged in) -->
     <div id="authLoadingScreen" class="fixed inset-0 bg-slate-50 z-[10000] flex flex-col items-center justify-center">
