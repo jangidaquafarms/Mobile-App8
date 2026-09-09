@@ -1,0 +1,2047 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Shrimp Farm Management - Farm Hub</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Firebase Compat Libraries for Direct Browser Sync & Auth -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
+    <style>
+        @media screen and (max-width: 768px) {
+            input, select, textarea {
+                font-size: 16px !important;
+            }
+        }
+        .pb-safe {
+            padding-bottom: max(12px, env(safe-area-inset-bottom));
+        }
+        .dropdown-scroll-list {
+            max-height: 200px;
+            overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior: contain;
+            touch-action: pan-y;
+        }
+        .dropdown-scroll-list::-webkit-scrollbar {
+            width: 6px;
+        }
+        .dropdown-scroll-list::-webkit-scrollbar-track {
+            background: #f8fafc;
+            border-radius: 8px;
+        }
+        .dropdown-scroll-list::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 8px;
+        }
+        .dropdown-scroll-list::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Farm Hub">
+    <link rel="apple-touch-icon" href="icon.png">
+    <link rel="icon" type="image/png" href="icon.png">
+</head>
+<body class="bg-slate-50 font-sans h-screen flex flex-col overflow-hidden">
+
+    <!-- Startup Loading Screen (Prevents PIN flash if already logged in) -->
+    <div id="authLoadingScreen" class="fixed inset-0 bg-slate-50 z-[10000] flex flex-col items-center justify-center">
+        <div class="w-9 h-9 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-3"></div>
+        <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Loading Farm Hub...</p>
+    </div>
+
+    <!-- 1-Time Setup PIN Lock Screen (Shown only on first visit or if signed out) -->
+    <div id="pinAuthScreen" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] hidden flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-xs rounded-2xl p-6 shadow-2xl text-center border border-slate-100">
+            <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-3 text-2xl">
+                🔒
+            </div>
+            <h2 class="text-lg font-black text-slate-800">Elite Aqualines</h2>
+            <p class="text-xs text-slate-500 mt-0.5 mb-5">Enter 6-digit PIN to activate this device</p>
+            
+            <input type="password" 
+                   id="authPinInput" 
+                   maxlength="6" 
+                   pattern="[0-9]*" 
+                   inputmode="numeric" 
+                   placeholder="••••••" 
+                   autofocus
+                   class="w-full text-center text-2xl font-black tracking-widest py-3 border-2 border-slate-200 rounded-xl outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100 transition">
+            
+            <div id="authStatusText" class="text-xs font-semibold mt-3 min-h-[18px]"></div>
+        </div>
+    </div>
+
+    <!-- Main App Container (Unlocks permanently after 1st PIN entry) -->
+    <div id="mainAppContainer" class="h-full flex flex-col overflow-hidden hidden">
+        
+        <!-- Fixed Header & Navigation Container -->
+        <div class="flex-shrink-0 z-30 bg-white shadow-sm">
+            <div class="bg-blue-600 text-white p-4 shadow-md">
+                <div class="max-w-md mx-auto flex justify-between items-center">
+                    <div class="flex items-center space-x-3">
+                        <span class="text-xl font-bold cursor-pointer">&lt;</span>
+                        <div>
+                            <div id="headerPondSection" class="hidden">
+                                <select id="pondSelector" onchange="changePond(this.value)" class="bg-blue-700 hover:bg-blue-800 text-white font-bold text-lg rounded-xl w-32 px-3 py-1 outline-none cursor-pointer border border-blue-400/60 shadow-sm transition">
+                                </select>
+                            </div>
+                            <div id="headerHomeTitle" class="text-lg font-bold">Elite Aqualines</div>
+                            <p id="headerSubtitleDate" class="text-xs text-blue-100 pl-0.5 pt-0.5 font-medium"></p>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-3 text-lg">
+                        <!-- Real-Time Sync Indicator -->
+                        <span id="syncStatusBadge" class="text-xs font-extrabold bg-blue-700 px-2 py-1 rounded-full border border-blue-400/40 text-blue-100 flex items-center gap-1" title="Real-time Cloud Sync Active">
+                            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Cloud Sync
+                        </span>
+                        <span onclick="window.location.reload()" class="cursor-pointer" title="Refresh">🔄</span>
+                        <span onclick="lockDevice()" class="cursor-pointer text-sm" title="Lock App">🔒</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Navigation Tabs: Home, Pond, Feed, Sampling, Treatment -->
+            <div class="bg-white border-b border-slate-200">
+                <div class="max-w-md mx-auto flex justify-between text-sm font-medium text-slate-500 px-2 overflow-x-auto no-scrollbar">
+                    <button onclick="switchTab('home')" id="tabHome" class="py-3 px-2.5 text-blue-600 border-b-2 border-blue-600 font-semibold whitespace-nowrap">Home</button>
+                    <button onclick="switchTab('pond')" id="tabPond" class="py-3 px-2.5 hover:text-blue-600 font-medium whitespace-nowrap">Pond</button>
+                    <button onclick="switchTab('feed')" id="tabFeed" class="py-3 px-2.5 hover:text-blue-600 font-medium whitespace-nowrap">Feed</button>
+                    <button onclick="switchTab('sampling')" id="tabSampling" class="py-3 px-2.5 hover:text-blue-600 font-medium whitespace-nowrap">Sampling</button>
+                    <button onclick="switchTab('treatment')" id="tabTreatment" class="py-3 px-2.5 hover:text-blue-600 font-medium whitespace-nowrap">Treatment</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Scrollable Main Content Area -->
+        <div class="flex-1 overflow-y-auto max-w-md w-full mx-auto p-4 pb-28">
+            
+            <!-- 1. Home View Container -->
+            <div id="homeView" class="space-y-4">
+                <div class="space-y-4" id="allPondsDashboardContainer"></div>
+            </div>
+
+            <!-- 2. Pond View Container -->
+            <div id="pondView" class="hidden space-y-4">
+                <div class="flex justify-between items-center bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wide">Pond Management</h3>
+                        <p class="text-xs text-slate-400" id="totalPondsCount">Loading...</p>
+                    </div>
+                    <button onclick="openPondModal()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-sm transition flex items-center gap-1.5">
+                        <span>+</span> Create Pond
+                    </button>
+                </div>
+                <div id="pondCardsList" class="space-y-3"></div>
+            </div>
+
+            <!-- 3. Feed View Container -->
+            <div id="feedView" class="hidden space-y-3">
+                <div class="flex justify-between items-center bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wide">Feed Tracking</h3>
+                        <p class="text-xs text-slate-400" id="currentFeedPondDisplay">Current: Pond P2</p>
+                    </div>
+                    <button onclick="openModal()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-sm transition flex items-center gap-1.5">
+                        <span>+</span> Record Feed
+                    </button>
+                </div>
+
+                <div class="flex justify-between items-center bg-white p-2.5 rounded-xl border border-slate-100 shadow-sm gap-2">
+                    <span class="text-xs font-bold text-slate-500 uppercase">Feed Logs</span>
+                    <div class="flex items-center gap-1.5">
+                        <button onclick="exportFeedCSV()" class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200 hover:bg-emerald-100 transition shadow-xs flex items-center gap-1" title="Backup Feed Logs to CSV">
+                            <span>📥</span> Backup
+                        </button>
+                        <button onclick="toggleSortOrder()" id="sortBtnText" class="text-xs font-semibold text-blue-600 bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-100 hover:bg-blue-100 transition shadow-xs">
+                            Latest First ↓
+                        </button>
+                    </div>
+                </div>
+
+                <div class="flex items-center text-[11px] font-bold text-slate-400 uppercase border-b pb-2 mb-2 gap-1 pt-1">
+                    <span class="w-16">Hours</span>
+                    <span class="flex-1 pl-1">Feed & Supp</span>
+                    <span class="w-14 text-right">Cumul.</span>
+                    <span class="w-5 text-center">Note</span>
+                    <span class="w-14 text-right pr-1">Action</span>
+                </div>
+
+                <div id="feedHistoryList" class="space-y-3"></div>
+            </div>
+
+            <!-- 4. Sampling View Container -->
+            <div id="samplingView" class="hidden space-y-4">
+                <div class="flex justify-between items-center bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wide">Biomass & Sampling</h3>
+                        <p class="text-xs text-slate-400" id="totalSamplingCount">0 Records Logged</p>
+                    </div>
+                    <button onclick="openSamplingModal()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-sm transition flex items-center gap-1.5">
+                        <span>+</span> Add Sample
+                    </button>
+                </div>
+
+                <div class="flex justify-between items-center bg-white p-2.5 rounded-xl border border-slate-100 shadow-sm gap-2">
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-xs font-bold text-slate-500 uppercase">Filter:</span>
+                        <select id="samplingPondFilterSelect" onchange="changeSamplingPondFilter(this.value)" class="bg-blue-50 border border-blue-100 text-blue-700 font-bold text-xs rounded-lg px-2.5 py-1.5 outline-none cursor-pointer shadow-xs">
+                            <option value="ALL">All Ponds</option>
+                        </select>
+                    </div>
+                    <button onclick="exportSamplingCSV()" class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200 hover:bg-emerald-100 transition shadow-xs flex items-center gap-1" title="Backup Sampling Logs to CSV">
+                        <span>📥</span> Backup
+                    </button>
+                </div>
+
+                <div id="samplingCardsList" class="space-y-4"></div>
+            </div>
+
+            <!-- 5. Treatment View Container -->
+            <div id="treatmentView" class="hidden space-y-4">
+                <div class="flex justify-between items-center bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wide">Pond Treatments</h3>
+                        <p class="text-xs text-slate-400" id="totalTreatmentCount">0 Records Logged</p>
+                    </div>
+                    <button onclick="openTreatmentModal()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-sm transition flex items-center gap-1.5">
+                        <span>+</span> Add Treatment
+                    </button>
+                </div>
+
+                <div class="flex justify-between items-center bg-white p-2.5 rounded-xl border border-slate-100 shadow-sm gap-2">
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-xs font-bold text-slate-500 uppercase">Filter:</span>
+                        <select id="treatmentPondFilterSelect" onchange="changeTreatmentPondFilter(this.value)" class="bg-blue-50 border border-blue-100 text-blue-700 font-bold text-xs rounded-lg px-2.5 py-1.5 outline-none cursor-pointer shadow-xs">
+                            <option value="ALL">All Ponds</option>
+                        </select>
+                    </div>
+                    <button onclick="exportTreatmentCSV()" class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200 hover:bg-emerald-100 transition shadow-xs flex items-center gap-1" title="Backup Treatment Logs to CSV">
+                        <span>📥</span> Backup
+                    </button>
+                </div>
+
+                <div id="treatmentCardsList" class="space-y-4"></div>
+            </div>
+
+        </div>
+
+        <!-- Bottom Action Button Bar -->
+        <div id="bottomActionBar" class="fixed bottom-0 left-0 right-0 bg-white border-t p-3 pb-safe shadow-lg z-40 hidden">
+            <div class="max-w-md mx-auto flex gap-3">
+                <button onclick="alert('Viewing active pond: ' + currentPond)" class="w-1/2 bg-blue-900 text-white py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 text-sm shadow-sm">
+                    <span>🔍</span> Status
+                </button>
+                <button onclick="openModal()" class="w-1/2 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 text-sm shadow-sm transition">
+                    <span>+</span> Record Feed
+                </button>
+            </div>
+        </div>
+
+        <!-- Add/Edit Treatment Modal -->
+        <div id="treatmentModal" class="fixed inset-0 bg-black/60 hidden flex items-end sm:items-center justify-center z-50">
+            <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl max-h-[90vh] overflow-y-auto p-5 shadow-2xl">
+                <div class="flex justify-between items-center border-b pb-3 mb-4">
+                    <div>
+                        <h2 id="treatmentModalTitleText" class="text-base font-bold text-slate-800">Add Pond Treatment</h2>
+                        <p id="treatmentModalSubtitleText" class="text-xs text-slate-500">Record probiotics, medicines & fertilizers</p>
+                    </div>
+                    <button onclick="closeTreatmentModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+                </div>
+
+                <form id="treatmentForm" onsubmit="handleTreatmentSubmit(event)" class="space-y-4 text-sm">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Treatment Date *</label>
+                            <input type="date" id="treatmentDate" required class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-xs">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Pond No. *</label>
+                            <select id="treatmentPond" required class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 bg-white font-bold text-xs"></select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">Category *</label>
+                        <div class="grid grid-cols-3 gap-1.5 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
+                            <label id="catLabelProbiotics" class="flex items-center justify-center py-2 text-xs font-extrabold rounded-lg cursor-pointer transition text-center select-none bg-blue-600 text-white shadow-sm">
+                                <input type="radio" name="treatmentCategory" value="Probiotics" checked class="hidden" onchange="selectTreatmentCategory('Probiotics')">
+                                Probiotics
+                            </label>
+                            <label id="catLabelMedicine" class="flex items-center justify-center py-2 text-xs font-extrabold rounded-lg cursor-pointer transition text-center select-none text-slate-600 hover:text-slate-900">
+                                <input type="radio" name="treatmentCategory" value="Medicine" class="hidden" onchange="selectTreatmentCategory('Medicine')">
+                                Medicine
+                            </label>
+                            <label id="catLabelFertilizers" class="flex items-center justify-center py-2 text-xs font-extrabold rounded-lg cursor-pointer transition text-center select-none text-slate-600 hover:text-slate-900">
+                                <input type="radio" name="treatmentCategory" value="Fertilizers" class="hidden" onchange="selectTreatmentCategory('Fertilizers')">
+                                Fertilizers
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="relative treatment-searchable-dropdown z-30">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Product Name / Chemical *</label>
+                        <div class="relative flex items-center">
+                            <input type="text"
+                                   id="treatmentProduct"
+                                   required
+                                   class="w-full border border-slate-200 p-2.5 sm:p-2 pr-6 rounded text-sm sm:text-xs bg-white outline-none focus:ring-1 focus:ring-blue-500 font-medium text-slate-700"
+                                   placeholder="Tap to search product..."
+                                   autocomplete="off"
+                                   onfocus="openTreatmentDropdown()"
+                                   onclick="openTreatmentDropdown()"
+                                   oninput="filterTreatmentOptions(this.value)">
+                            <span class="absolute right-2 text-slate-400 pointer-events-none text-[10px]">▼</span>
+                        </div>
+                        <div id="treatmentOptionsList" class="dropdown-scroll-list absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-2xl z-50 hidden divide-y divide-slate-100">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Quantity / Dose Applied *</label>
+                        <div class="relative flex items-center">
+                            <input type="number" step="0.01" id="treatmentQty" placeholder="e.g. 5 or 0.5" required class="w-full border border-slate-200 p-2.5 sm:p-2 rounded text-sm sm:text-xs bg-white outline-none focus:ring-1 focus:ring-blue-500 font-bold text-slate-800 pr-16">
+                            <span id="treatmentUnitBadge" class="absolute right-2 px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded text-xs font-black pointer-events-none">Kg</span>
+                        </div>
+                        <p class="text-[10px] text-slate-400 mt-1">Base unit auto-detected (Kg / Ltr) for clean inventory reconciliation.</p>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Treatment Purpose *</label>
+                        <select id="treatmentPurpose" required class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 bg-white text-xs font-medium">
+                            <option value="Water Quality">Water Quality Management</option>
+                            <option value="Mineral Booster">Mineral Booster / Molt Support</option>
+                            <option value="Soil Probiotic">Soil & Bottom Probiotic</option>
+                            <option value="Water Probiotic">Water Column Probiotics</option>
+                            <option value="Disinfection / Sanitizer">Disinfection & Sanitizing</option>
+                            <option value="Oxygen Enhancer">Oxygen Enhancer</option>
+                            <option value="pH / Alkalinity Adjustment">pH & Alkalinity Adjustment</option>
+                            <option value="Plankton Control">Plankton / Algae Bloom Control</option>
+                            <option value="Other">Other Treatment</option>
+                        </select>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Notes / Observations</label>
+                        <textarea id="treatmentNotes" rows="2" placeholder="e.g. Applied along with aerators running..." class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-xs"></textarea>
+                    </div>
+
+                    <button type="submit" id="treatmentSubmitBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold shadow-md transition">Save Treatment</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Add/Edit Sampling Modal -->
+        <div id="samplingModal" class="fixed inset-0 bg-black/60 hidden flex items-end sm:items-center justify-center z-50">
+            <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl max-h-[90vh] overflow-y-auto p-5 shadow-2xl">
+                <div class="flex justify-between items-center border-b pb-3 mb-4">
+                    <div>
+                        <h2 id="samplingModalTitleText" class="text-base font-bold text-slate-800">Record Sampling Data</h2>
+                        <p id="samplingModalSubtitleText" class="text-xs text-slate-500">Calculate Average Body Weight (ABW)</p>
+                    </div>
+                    <button onclick="closeSamplingModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+                </div>
+
+                <form id="samplingForm" onsubmit="handleSamplingSubmit(event)" class="space-y-4 text-sm">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Date of Sampling *</label>
+                            <input type="date" id="samplingDate" required class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-xs">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Pond No. *</label>
+                            <select id="samplingPond" required class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 bg-white font-bold text-xs"></select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Sample Weight (gm) *</label>
+                            <input type="number" step="0.1" id="sampleWeight" placeholder="e.g. 500" required oninput="calcABW()" class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-xs">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Count (Pieces) *</label>
+                            <input type="number" id="sampleCount" placeholder="e.g. 32" required oninput="calcABW()" class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-xs">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Average Body Weight (ABW)</label>
+                        <div class="relative">
+                            <input type="text" id="sampleABW" readonly placeholder="Auto calculated (Weight ÷ Count)" class="w-full border border-slate-200 p-2.5 rounded-lg bg-emerald-50/70 text-emerald-700 font-extrabold outline-none text-sm">
+                            <span class="absolute right-3 top-2.5 text-xs text-emerald-600 font-semibold">gm/shrimp</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Notes (Optional)</label>
+                        <textarea id="samplingNotes" rows="2" placeholder="Observation on health, gut, molt stage..." class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-xs"></textarea>
+                    </div>
+
+                    <button type="submit" id="samplingSubmitBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold shadow-md transition">Save Sample</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Create / Edit Pond Modal -->
+        <div id="pondModal" class="fixed inset-0 bg-black/60 hidden flex items-end sm:items-center justify-center z-50">
+            <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl max-h-[90vh] overflow-y-auto p-5 shadow-2xl">
+                <div class="flex justify-between items-center border-b pb-3 mb-4">
+                    <div>
+                        <h2 id="pondModalTitleText" class="text-base font-bold text-slate-800">Create New Pond</h2>
+                        <p id="pondModalSubtitleText" class="text-xs text-slate-500">Configure pond specs & stocking details</p>
+                    </div>
+                    <button onclick="closePondModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+                </div>
+
+                <form id="pondForm" onsubmit="handlePondSubmit(event)" class="space-y-4 text-sm">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Pond Name / ID *</label>
+                        <input type="text" id="newPondName" placeholder="e.g. P6" required class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 uppercase font-semibold">
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Length (m) *</label>
+                            <input type="number" step="0.1" id="pondLength" placeholder="L" required oninput="calcPondArea()" class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Breadth (m) *</label>
+                            <input type="number" step="0.1" id="pondBreadth" placeholder="B" required oninput="calcPondArea()" class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Area (m²)</label>
+                            <input type="text" id="pondArea" readonly placeholder="Auto L×B" class="w-full border border-slate-200 p-2.5 rounded-lg bg-slate-100 text-slate-700 font-bold outline-none">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Stocking Date *</label>
+                        <input type="date" id="pondStockingDate" required class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Stocking Count (PL Seeds) *</label>
+                        <input type="number" id="pondStockingCount" placeholder="e.g. 150000" required class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+
+                    <button type="submit" id="pondModalSubmitBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold shadow-md transition">Save Pond</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Add/Edit Feed Data Modal -->
+        <div id="feedModal" class="fixed inset-0 bg-black/50 hidden flex items-end sm:items-center justify-center z-50">
+            <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl max-h-[90vh] overflow-y-auto p-5 shadow-2xl">
+                <div class="flex justify-between items-center border-b pb-3 mb-4">
+                    <div>
+                        <h2 id="modalTitleText" class="text-base font-bold text-slate-800">Add Feed Data</h2>
+                        <p id="modalSubtitle" class="text-xs text-slate-500">Farm: Elite Aqualines 2026 C2 | P2</p>
+                    </div>
+                    <button onclick="closeModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+                </div>
+
+                <form id="feedForm" onsubmit="handleFormSubmit(event)" class="space-y-4 text-sm">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Feeding Date *</label>
+                        <input type="date" id="feedingDate" required class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Time *</label>
+                        <div onclick="openClockPicker()" id="timeDisplayBox" class="w-full border border-slate-200 p-2.5 rounded-lg bg-white cursor-pointer flex justify-between items-center text-sm font-medium text-slate-700 hover:border-blue-500 transition">
+                            <span id="selectedTimeString">07:00 AM</span>
+                            <span class="text-blue-600">⏰</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Fasting</label>
+                        <div class="flex gap-6">
+                            <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="fasting" value="Yes" onchange="toggleFasting(true)"> Yes</label>
+                            <label class="flex items-center gap-2 cursor-pointer"><input type="radio" name="fasting" value="No" checked onchange="toggleFasting(false)"> No</label>
+                        </div>
+                    </div>
+
+                    <!-- Feed Codes & Quantities Box -->
+                    <div id="feedProductsSection" class="space-y-3 border-t pt-3 relative z-20">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs font-bold text-slate-500 uppercase">Feed Codes & Quantities (Max 2 Mix)</span>
+                            <button type="button" onclick="addFeedRow()" class="text-xs text-blue-600 font-semibold hover:underline">+ Mix Second Feed</button>
+                        </div>
+                        <div id="feedRowsContainer" class="space-y-2"></div>
+                    </div>
+
+                    <!-- Searchable Supplement Section -->
+                    <div id="supplementProductsSection" class="space-y-2 border-t pt-3 relative z-10">
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs font-bold text-slate-500 uppercase">Supplement (1 Item Only)</span>
+                            <span class="text-[11px] text-slate-400">Dose × Total Feed</span>
+                        </div>
+                        <div class="flex gap-2 items-center bg-amber-50/50 p-2.5 rounded-xl border border-amber-200">
+                            <div class="relative w-6/12 supp-searchable-dropdown">
+                                <input type="hidden" id="singleSuppCode" value="">
+                                <div class="relative flex items-center">
+                                    <input type="text"
+                                           id="singleSuppSearchInput"
+                                           class="w-full border border-slate-200 p-2.5 sm:p-2 pr-6 rounded text-sm sm:text-xs bg-white outline-none focus:ring-1 focus:ring-blue-500 font-medium text-slate-700"
+                                           placeholder="Search supplement..."
+                                           autocomplete="off"
+                                           onfocus="openSuppDropdown()"
+                                           onclick="openSuppDropdown()"
+                                           oninput="filterSuppOptions(this.value)">
+                                    <span class="absolute right-2 text-slate-400 pointer-events-none text-[10px]">▼</span>
+                                </div>
+                                <div id="suppOptionsList" class="dropdown-scroll-list absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-2xl z-50 hidden divide-y divide-slate-100">
+                                </div>
+                            </div>
+
+                            <input type="number" step="0.1" id="singleSuppDose" placeholder="Dose (gm/ml)" oninput="updateSupplementCalculations()" class="w-3/12 border border-slate-200 p-2.5 sm:p-2 rounded text-sm sm:text-xs bg-white outline-none focus:ring-1 focus:ring-blue-500 font-medium text-slate-700">
+                            <input type="text" id="singleSuppCalcQty" placeholder="Auto" readonly class="w-3/12 border border-slate-200 p-2 rounded text-xs bg-slate-100 text-slate-700 font-bold outline-none text-right">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Notes (Optional)</label>
+                        <textarea id="notes" rows="2" placeholder="Optional comments..." class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                    </div>
+
+                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-medium shadow-md transition">Save Entry</button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Clock Picker Popup -->
+        <div id="clockModal" class="fixed inset-0 bg-black/60 hidden flex items-center justify-center p-4" style="z-index: 100;">
+            <div class="bg-white w-full max-w-xs rounded-3xl p-6 shadow-2xl space-y-6">
+                <h3 class="text-sm font-bold text-slate-700">Select Time</h3>
+
+                <div class="flex justify-between items-center">
+                    <div class="flex items-center bg-slate-100 rounded-2xl p-1 shadow-inner">
+                        <button type="button" id="digitalHourBox" onclick="switchClockMode('hour')" class="px-4 py-2 rounded-xl text-3xl font-bold bg-blue-600 text-white shadow-md transition">07</button>
+                        <span class="text-3xl font-bold text-slate-700 px-1">:</span>
+                        <button type="button" id="digitalMinuteBox" onclick="switchClockMode('minute')" class="px-4 py-2 rounded-xl text-3xl font-bold text-slate-600 hover:bg-slate-200 transition">00</button>
+                    </div>
+
+                    <div class="flex flex-col border border-slate-200 rounded-xl overflow-hidden shadow-sm text-xs font-bold">
+                        <button type="button" id="amBtn" onclick="setAmPm('AM')" class="px-3 py-2 bg-slate-800 text-white transition">AM</button>
+                        <button type="button" id="pmBtn" onclick="setAmPm('PM')" class="px-3 py-2 bg-white text-slate-600 hover:bg-slate-100 transition">PM</button>
+                    </div>
+                </div>
+
+                <div class="relative w-64 h-64 mx-auto bg-slate-100 rounded-full border-2 border-slate-200 flex items-center justify-center shadow-inner" id="clockFace">
+                    <svg class="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 256 256">
+                        <line id="clockHandLine" x1="128" y1="128" x2="128" y2="52" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round" />
+                        <circle id="clockHandDot" cx="128" cy="52" r="14" fill="#2563eb" opacity="0.15" />
+                        <circle cx="128" cy="128" r="5" fill="#2563eb" />
+                    </svg>
+                </div>
+
+                <div class="flex justify-between items-center pt-2">
+                    <button type="button" class="text-slate-400 hover:text-slate-600 text-lg">⌨️</button>
+                    <div class="flex gap-4">
+                        <button type="button" onclick="closeClockPicker()" class="text-blue-600 font-semibold text-sm hover:underline">Cancel</button>
+                        <button type="button" onclick="confirmClockTime()" class="text-blue-600 font-semibold text-sm hover:underline">OK</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // Real-Time Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDLf5brXhAIpqBBsuDNgUSe6JAGtwt_jxY",
+            authDomain: "bluecrest-807d9.firebaseapp.com",
+            projectId: "bluecrest-807d9",
+            storageBucket: "bluecrest-807d9.firebasestorage.app",
+            messagingSenderId: "958454959822",
+            appId: "1:958454959822:web:b291de038e674b933f4a9f"
+        };
+
+        const FIXED_USER_EMAIL = "jangidaquafarms@gmail.com";
+
+        let db = null;
+        let isFirebaseConnected = false;
+        let isSyncInitialized = false;
+
+        try {
+            firebase.initializeApp(firebaseConfig);
+            // Persistent session across all future tabs & browser restarts
+            firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+            db = firebase.firestore();
+            db.enablePersistence({ synchronizeTabs: true }).catch(err => {
+                console.log("Persistence note: " + err.code);
+            });
+            isFirebaseConnected = true;
+        } catch (err) {
+            console.warn("Running in local browser fallback mode.", err);
+        }
+
+        // Authentication & PIN Listeners
+        const pinInput = document.getElementById('authPinInput');
+        const authStatus = document.getElementById('authStatusText');
+        const authLoading = document.getElementById('authLoadingScreen');
+        const authScreen = document.getElementById('pinAuthScreen');
+        const mainApp = document.getElementById('mainAppContainer');
+
+        // Auto-unlock when 6th digit is typed
+        pinInput.addEventListener('input', async () => {
+            const pin = pinInput.value.trim();
+            if (pin.length === 6) {
+                authStatus.textContent = "Verifying PIN...";
+                authStatus.className = "text-xs font-semibold mt-3 min-h-[18px] text-blue-600";
+
+                try {
+                    await firebase.auth().signInWithEmailAndPassword(FIXED_USER_EMAIL, pin);
+                    authStatus.textContent = "";
+                    pinInput.value = "";
+                } catch (err) {
+                    authStatus.textContent = "Incorrect PIN. Try again.";
+                    authStatus.className = "text-xs font-semibold mt-3 min-h-[18px] text-rose-600";
+                    pinInput.value = "";
+                }
+            }
+        });
+
+        // Instant session detection (remembers previous login)
+        firebase.auth().onAuthStateChanged((user) => {
+            authLoading.classList.add('hidden');
+
+            if (user) {
+                // User already entered PIN in the past -> Skip directly to App
+                authScreen.classList.add('hidden');
+                mainApp.classList.remove('hidden');
+                if (!isSyncInitialized) {
+                    isSyncInitialized = true;
+                    initRealtimeSync();
+                }
+            } else {
+                // New device or logged out -> Show PIN screen
+                authScreen.classList.remove('hidden');
+                mainApp.classList.add('hidden');
+                pinInput.value = "";
+                pinInput.focus();
+            }
+        });
+
+        function lockDevice() {
+            if (confirm("Lock this device? You will need your 6-digit PIN to re-enter.")) {
+                firebase.auth().signOut();
+            }
+        }
+
+        // App Data Storage
+        let ponds = JSON.parse(localStorage.getItem('bc_ponds')) || [
+            { id: 'P1', length: 100, breadth: 50, area: 5000, stockingDate: '2026-07-28', stockingCount: 150000 },
+            { id: 'P2', length: 100, breadth: 60, area: 6000, stockingDate: '2026-07-28', stockingCount: 180000 },
+            { id: 'P3', length: 80, breadth: 50, area: 4000, stockingDate: '2026-08-01', stockingCount: 120000 },
+            { id: 'P4', length: 120, breadth: 60, area: 7200, stockingDate: '2026-08-05', stockingCount: 200000 },
+            { id: 'P5', length: 90, breadth: 50, area: 4500, stockingDate: '2026-08-10', stockingCount: 135000 }
+        ];
+
+        let feedEntries = JSON.parse(localStorage.getItem('bc_feeds')) || [];
+        let samplingEntries = JSON.parse(localStorage.getItem('bc_sampling')) || [];
+        let treatmentEntries = JSON.parse(localStorage.getItem('bc_treatments')) || [];
+
+        const treatmentCatalog = {
+            'Probiotics': [
+                'Kemin Prozyta WP-1Kg', 'Pond Dtox-1Kg', 'Neo Pro WP', 'Thionil-SP-1Kg',
+                'Pond Plus-1Kg', 'Probacilla WP-1Kg', 'Posidon Suprem PS',
+                'Posidon Supreme PS-20Ltr', 'Provet Rhodobac-20Ltr', 'CP PS-20Ltr', 'Gentech-P.S.-20Ltr'
+            ],
+            'Medicine': [
+                'Bleaching Powder-25Kg', 'Nommonia-500gm', 'Posidon Relief Sani-1Ltr',
+                'Posidon Freeze 80-1Ltr', 'Provet Benzatec 80-1Ltr', 'Pisanco Sanityz-1Ltr',
+                'Challenger Sani-1Ltr', 'Tablet India NOVIB-500gm', 'PVS White Master-5Ltr',
+                'Oxygen Sodium Percarbonate', 'Clarity Growel EDTA-5Kg', 'Aqua Soft-1Kg',
+                'Provet Raprosoft-1Kg', 'Avant D-Flow-20Ltr'
+            ],
+            'Fertilizers': [
+                'Avant Miner Mate', 'Potash', 'Posidon Boomin 20Kg', 'Magnesium Chloride',
+                'Kemin Mastermin-20Kg', 'Kemin Aqua Ratio-1Kg', 'Levish Mineral-20Kg',
+                'KMAX-10Kg', 'Kemin Mastermin AR-25Kg', 'Calgophos Virbac-10Ltr',
+                'CPF Zeolite Ultra-20Kg', 'Zeomin Forte-10Kg', 'Kemin Clamore Dry-20Kg'
+            ]
+        };
+
+        const availableSupplements = [
+            { code: 'Kemin Aquablenz-1Kg', name: 'Kemin Aquablenz-1Kg' },
+            { code: 'Kemin Nutrasist-1Kg', name: 'Kemin Nutrasist-1Kg' },
+            { code: 'Kemin Pathrol-1Ltr', name: 'Kemin Pathrol-1Ltr' },
+            { code: 'Pathostat-1Kg', name: 'Pathostat-1Kg' },
+            { code: 'Tablet India NOVIB-500gm', name: 'Tablet India NOVIB-500gm' },
+            { code: 'Calgophos Virbac-10Ltr', name: 'Calgophos Virbac-10Ltr' },
+            { code: 'Kemin Aquastem V-1Kg', name: 'Kemin Aquastem V-1Kg' },
+            { code: 'Karyomax Plus-1Kg', name: 'Karyomax Plus-1Kg' },
+            { code: 'PVS White Master-5Ltr', name: 'PVS White Master-5Ltr' },
+            { code: 'Virbac Hipanomix-500gm', name: 'Virbac Hipanomix-500gm' },
+            { code: 'Kemin Aquavibra-1Kg', name: 'Kemin Aquavibra-1Kg' },
+            { code: 'Kemin Aquaratio-1Kg', name: 'Kemin Aquaratio-1Kg' }
+        ];
+
+        const availableFeedCodes = [
+            { code: 'Feed 1C', name: 'Feed 1C' },
+            { code: 'Feed 2C', name: 'Feed 2C' },
+            { code: 'Feed 3sp', name: 'Feed 3sp' },
+            { code: 'Feed 4P', name: 'Feed 4P' },
+            { code: 'Feed 5P', name: 'Feed 5P' },
+            { code: 'Feed 6P', name: 'Feed 6P' },
+            { code: 'Feed 7P', name: 'Feed 7P' },
+            { code: 'CPF 1', name: 'CPF 1' },
+            { code: 'CPF 2', name: 'CPF 2' },
+            { code: 'CPF 2P', name: 'CPF 2P' },
+            { code: 'CPF 3', name: 'CPF 3' },
+            { code: 'CPF 3S', name: 'CPF 3S' },
+            { code: 'CPF 3P', name: 'CPF 3P' },
+            { code: 'CPF 4S', name: 'CPF 4S' }
+        ];
+
+        let currentPond = 'P2';
+        let sortDirection = 'desc';
+        let editingPondId = null;
+        let editingSampleId = null;
+        let editingTreatmentId = null;
+        let editingEntryId = null;
+        let samplingPondFilter = 'ALL';
+        let treatmentPondFilter = 'ALL';
+
+        let selectedHour = 7;
+        let selectedMinute = 0;
+        let period = 'AM';
+        let clockMode = 'hour';
+
+        function determineUnit(productName) {
+            if (!productName) return 'Kg';
+            const lower = productName.toLowerCase();
+            if (lower.includes('ltr') || lower.includes('liter') || lower.includes('ml') || lower.includes(' ps') || lower.includes('-ps') || lower.includes('rhodobac') || lower.includes('d-flow')) {
+                return 'Ltr';
+            }
+            return 'Kg';
+        }
+
+        // Real-Time Listeners
+        function initRealtimeSync() {
+            const statusEl = document.getElementById('syncStatusBadge');
+
+            if (!isFirebaseConnected || !db) {
+                if (statusEl) {
+                    statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400"></span> Local`;
+                }
+                recalculateCumulatives();
+                refreshAllViews();
+                return;
+            }
+
+            if (statusEl) {
+                statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Cloud Sync`;
+            }
+
+            // Sync Ponds
+            db.collection('ponds').onSnapshot(snap => {
+                if (!snap.empty) {
+                    ponds = snap.docs.map(doc => doc.data());
+                    localStorage.setItem('bc_ponds', JSON.stringify(ponds));
+                } else if (ponds.length > 0) {
+                    ponds.forEach(p => db.collection('ponds').doc(p.id).set(p));
+                }
+                syncPondDropdown();
+                renderPondList();
+                renderAllPondsSummary();
+            }, err => console.error("Ponds sync error:", err));
+
+            // Sync Feeds
+            db.collection('feeds').onSnapshot(snap => {
+                feedEntries = snap.docs.map(doc => doc.data());
+                localStorage.setItem('bc_feeds', JSON.stringify(feedEntries));
+                recalculateCumulatives();
+                renderAllPondsSummary();
+                renderHistory();
+            }, err => console.error("Feeds sync error:", err));
+
+            // Sync Sampling
+            db.collection('sampling').onSnapshot(snap => {
+                samplingEntries = snap.docs.map(doc => doc.data());
+                localStorage.setItem('bc_sampling', JSON.stringify(samplingEntries));
+                renderSamplingList();
+            }, err => console.error("Sampling sync error:", err));
+
+            // Sync Treatments
+            db.collection('treatments').onSnapshot(snap => {
+                treatmentEntries = snap.docs.map(doc => doc.data());
+                localStorage.setItem('bc_treatments', JSON.stringify(treatmentEntries));
+                renderTreatmentList();
+            }, err => console.error("Treatments sync error:", err));
+        }
+
+        function refreshAllViews() {
+            syncPondDropdown();
+            renderAllPondsSummary();
+            renderPondList();
+            renderHistory();
+            renderSamplingList();
+            renderTreatmentList();
+        }
+
+        function savePondToDb(pondObj) {
+            if (isFirebaseConnected && db) {
+                db.collection('ponds').doc(pondObj.id).set(pondObj);
+            } else {
+                localStorage.setItem('bc_ponds', JSON.stringify(ponds));
+            }
+        }
+
+        function deletePondFromDb(pondId) {
+            if (isFirebaseConnected && db) {
+                db.collection('ponds').doc(pondId).delete();
+            } else {
+                localStorage.setItem('bc_ponds', JSON.stringify(ponds));
+            }
+        }
+
+        function saveFeedToDb(entryObj) {
+            if (isFirebaseConnected && db) {
+                db.collection('feeds').doc(entryObj.id.toString()).set(entryObj);
+            } else {
+                localStorage.setItem('bc_feeds', JSON.stringify(feedEntries));
+                recalculateCumulatives();
+                renderAllPondsSummary();
+                renderHistory();
+            }
+        }
+
+        function deleteFeedFromDb(entryId) {
+            if (isFirebaseConnected && db) {
+                db.collection('feeds').doc(entryId.toString()).delete();
+            } else {
+                feedEntries = feedEntries.filter(item => item.id !== entryId);
+                localStorage.setItem('bc_feeds', JSON.stringify(feedEntries));
+                recalculateCumulatives();
+                renderAllPondsSummary();
+                renderHistory();
+            }
+        }
+
+        function saveSamplingToDb(sampleObj) {
+            if (isFirebaseConnected && db) {
+                db.collection('sampling').doc(sampleObj.id.toString()).set(sampleObj);
+            } else {
+                localStorage.setItem('bc_sampling', JSON.stringify(samplingEntries));
+                renderSamplingList();
+            }
+        }
+
+        function deleteSamplingFromDb(sampleId) {
+            if (isFirebaseConnected && db) {
+                db.collection('sampling').doc(sampleId.toString()).delete();
+            } else {
+                samplingEntries = samplingEntries.filter(s => s.id !== sampleId);
+                localStorage.setItem('bc_sampling', JSON.stringify(samplingEntries));
+                renderSamplingList();
+            }
+        }
+
+        function saveTreatmentToDb(treatObj) {
+            if (isFirebaseConnected && db) {
+                db.collection('treatments').doc(treatObj.id.toString()).set(treatObj);
+            } else {
+                localStorage.setItem('bc_treatments', JSON.stringify(treatmentEntries));
+                renderTreatmentList();
+            }
+        }
+
+        function deleteTreatmentFromDb(treatId) {
+            if (isFirebaseConnected && db) {
+                db.collection('treatments').doc(treatId.toString()).delete();
+            } else {
+                treatmentEntries = treatmentEntries.filter(t => t.id !== treatId);
+                localStorage.setItem('bc_treatments', JSON.stringify(treatmentEntries));
+                renderTreatmentList();
+            }
+        }
+
+        function getEntryTimestamp(entry) {
+            if (!entry || !entry.date) return 0;
+            const parts = (entry.time || '12:00 AM').split(' ');
+            const hm = (parts[0] || '12:00').split(':');
+            let h = parseInt(hm[0], 10) || 0;
+            const m = parseInt(hm[1], 10) || 0;
+            const mer = (parts[1] || 'AM').toUpperCase();
+            if (mer === 'PM' && h < 12) h += 12;
+            if (mer === 'AM' && h === 12) h = 0;
+            const [year, month, day] = entry.date.split('-').map(Number);
+            return new Date(year, month - 1, day, h, m).getTime();
+        }
+
+        function recalculateCumulatives() {
+            const allPondIds = new Set([...ponds.map(p => p.id), ...feedEntries.map(e => e.pond)]);
+            
+            allPondIds.forEach(pondId => {
+                let pondLogs = feedEntries.filter(item => item.pond === pondId);
+                pondLogs.sort((a, b) => getEntryTimestamp(a) - getEntryTimestamp(b));
+                
+                let runningTotal = 0;
+                pondLogs.forEach(entry => {
+                    const fedQty = entry.fasting ? 0 : (parseFloat(entry.qty) || 0);
+                    runningTotal += fedQty;
+                    entry.cumulative = runningTotal;
+                });
+            });
+        }
+
+        function getGrowthFromLastSample(targetSample) {
+            const earlierSamples = samplingEntries
+                .filter(s => s.pond === targetSample.pond && s.id !== targetSample.id)
+                .filter(s => {
+                    const dateDiff = new Date(targetSample.date + 'T00:00:00') - new Date(s.date + 'T00:00:00');
+                    if (dateDiff > 0) return true;
+                    if (dateDiff === 0) return s.id < targetSample.id;
+                    return false;
+                })
+                .sort((a, b) => new Date(b.date + 'T00:00:00') - new Date(a.date + 'T00:00:00') || b.id - a.id);
+
+            if (earlierSamples.length === 0) {
+                return { hasPrev: false, diff: 0, text: '--' };
+            }
+
+            const prev = earlierSamples[0];
+            const diff = targetSample.abw - prev.abw;
+            const sign = diff >= 0 ? '+' : '';
+            return {
+                hasPrev: true,
+                diff: diff,
+                text: `${sign}${diff.toFixed(2)} gm`
+            };
+        }
+
+        function calculateDOC(stockingDateStr, latestDateStr) {
+            if (!stockingDateStr || !latestDateStr) return 0;
+            const stock = new Date(stockingDateStr + 'T00:00:00');
+            const latest = new Date(latestDateStr + 'T00:00:00');
+            const diffTime = latest - stock;
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            return diffDays >= 0 ? diffDays : 0;
+        }
+
+        function getSystemLatestDate() {
+            if (feedEntries.length > 0) {
+                const sortedAll = [...feedEntries].sort((a, b) => new Date(b.date) - new Date(a.date));
+                return sortedAll[0].date;
+            }
+            return new Date().toISOString().split('T')[0];
+        }
+
+        function formatDateDisplay(dateStr) {
+            let d = new Date(dateStr + 'T00:00:00');
+            return !isNaN(d) ? d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : dateStr;
+        }
+
+        function updateHeaderDate() {
+            const latestDateStr = getSystemLatestDate();
+            const formatted = formatDateDisplay(latestDateStr);
+            const subtitleEl = document.getElementById('headerSubtitleDate');
+            if (subtitleEl) subtitleEl.innerText = formatted;
+        }
+
+        function syncPondDropdown() {
+            const selector = document.getElementById('pondSelector');
+            const samplingPondSelect = document.getElementById('samplingPond');
+            const samplingFilterSelect = document.getElementById('samplingPondFilterSelect');
+            const treatmentPondSelect = document.getElementById('treatmentPond');
+            const treatmentFilterSelect = document.getElementById('treatmentPondFilterSelect');
+            
+            selector.innerHTML = '';
+            if (samplingPondSelect) samplingPondSelect.innerHTML = '';
+            if (treatmentPondSelect) treatmentPondSelect.innerHTML = '';
+            if (samplingFilterSelect) samplingFilterSelect.innerHTML = '<option value="ALL">All Ponds</option>';
+            if (treatmentFilterSelect) treatmentFilterSelect.innerHTML = '<option value="ALL">All Ponds</option>';
+
+            if (ponds.length === 0) {
+                const opt = document.createElement('option');
+                opt.value = '';
+                opt.innerText = 'No Ponds';
+                selector.appendChild(opt);
+                return;
+            }
+
+            if (!ponds.some(p => p.id === currentPond)) currentPond = ponds[0].id;
+            if (samplingPondFilter !== 'ALL' && !ponds.some(p => p.id === samplingPondFilter)) samplingPondFilter = 'ALL';
+            if (treatmentPondFilter !== 'ALL' && !ponds.some(p => p.id === treatmentPondFilter)) treatmentPondFilter = 'ALL';
+
+            ponds.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.innerText = p.id;
+                if (p.id === currentPond) opt.selected = true;
+                selector.appendChild(opt);
+
+                if (samplingPondSelect) {
+                    const sOpt = document.createElement('option');
+                    sOpt.value = p.id;
+                    sOpt.innerText = p.id;
+                    samplingPondSelect.appendChild(sOpt);
+                }
+
+                if (treatmentPondSelect) {
+                    const tOpt = document.createElement('option');
+                    tOpt.value = p.id;
+                    tOpt.innerText = p.id;
+                    treatmentPondSelect.appendChild(tOpt);
+                }
+
+                if (samplingFilterSelect) {
+                    const fOpt = document.createElement('option');
+                    fOpt.value = p.id;
+                    fOpt.innerText = p.id;
+                    if (p.id === samplingPondFilter) fOpt.selected = true;
+                    samplingFilterSelect.appendChild(fOpt);
+                }
+
+                if (treatmentFilterSelect) {
+                    const tfOpt = document.createElement('option');
+                    tfOpt.value = p.id;
+                    tfOpt.innerText = p.id;
+                    if (p.id === treatmentPondFilter) tfOpt.selected = true;
+                    treatmentFilterSelect.appendChild(tfOpt);
+                }
+            });
+        }
+
+        function switchTab(tab) {
+            const tabs = ['home', 'pond', 'feed', 'sampling', 'treatment'];
+            const bottomBar = document.getElementById('bottomActionBar');
+            const headerPondSection = document.getElementById('headerPondSection');
+            const headerHomeTitle = document.getElementById('headerHomeTitle');
+
+            tabs.forEach(t => {
+                const tabBtn = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1));
+                const viewEl = document.getElementById(t + 'View');
+                
+                if (t === tab) {
+                    tabBtn.className = "py-3 px-2.5 text-blue-600 border-b-2 border-blue-600 font-semibold whitespace-nowrap";
+                    viewEl.classList.remove('hidden');
+                } else {
+                    tabBtn.className = "py-3 px-2.5 hover:text-blue-600 font-medium whitespace-nowrap";
+                    viewEl.classList.add('hidden');
+                }
+            });
+
+            if (tab === 'feed') {
+                bottomBar.classList.remove('hidden');
+                headerPondSection.classList.remove('hidden');
+                headerHomeTitle.classList.add('hidden');
+                const pondDisplay = document.getElementById('currentFeedPondDisplay');
+                if (pondDisplay) pondDisplay.innerText = `Current: Pond ${currentPond}`;
+                renderHistory();
+            } else {
+                bottomBar.classList.add('hidden');
+                headerPondSection.classList.add('hidden');
+                headerHomeTitle.classList.remove('hidden');
+                if (tab === 'home') renderAllPondsSummary();
+                if (tab === 'pond') renderPondList();
+                if (tab === 'sampling') renderSamplingList();
+                if (tab === 'treatment') renderTreatmentList();
+            }
+            updateHeaderDate();
+        }
+
+        function changePond(pond) {
+            currentPond = pond;
+            const pondDisplay = document.getElementById('currentFeedPondDisplay');
+            if (pondDisplay) pondDisplay.innerText = `Current: Pond ${currentPond}`;
+            renderHistory();
+        }
+
+        function changeSamplingPondFilter(v) {
+            samplingPondFilter = v;
+            renderSamplingList();
+        }
+
+        function changeTreatmentPondFilter(v) {
+            treatmentPondFilter = v;
+            renderTreatmentList();
+        }
+
+        function toggleSortOrder() {
+            sortDirection = sortDirection === 'desc' ? 'asc' : 'desc';
+            document.getElementById('sortBtnText').innerText = sortDirection === 'desc' ? 'Latest First ↓' : 'Oldest First ↑';
+            renderHistory();
+        }
+
+        function renderAllPondsSummary() {
+            const container = document.getElementById('allPondsDashboardContainer');
+            container.innerHTML = '';
+
+            const latestSystemDate = getSystemLatestDate();
+            const formattedDate = formatDateDisplay(latestSystemDate);
+
+            if (ponds.length === 0) {
+                container.innerHTML = `<div class="bg-white p-6 rounded-2xl border border-slate-100 text-center text-slate-400 text-sm">No ponds active.</div>`;
+                return;
+            }
+
+            ponds.forEach(pond => {
+                const pondId = pond.id;
+                const pondEntries = feedEntries.filter(item => item.pond === pondId);
+                
+                let tillTodayTotal = pondEntries.reduce((acc, curr) => acc + (curr.fasting ? 0 : (parseFloat(curr.qty) || 0)), 0);
+                let latestDateTotal = pondEntries
+                    .filter(item => item.date === latestSystemDate)
+                    .reduce((acc, curr) => acc + (curr.fasting ? 0 : (parseFloat(curr.qty) || 0)), 0);
+
+                const doc = calculateDOC(pond.stockingDate, latestSystemDate);
+
+                const card = document.createElement('div');
+                card.className = 'bg-white p-5 rounded-2xl shadow-sm border border-slate-100 space-y-3';
+                card.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wide">${pondId} DASHBOARD SUMMARY</h3>
+                            <p class="text-xs text-slate-400 font-medium mt-0.5">${formattedDate}</p>
+                        </div>
+                        <span class="text-lg font-black text-emerald-600">DOC ${doc}</span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="bg-blue-50 p-3 rounded-xl border border-blue-100">
+                            <span class="text-xs text-slate-500 block">Today's Feed</span>
+                            <span class="text-lg font-extrabold text-blue-600">${latestDateTotal.toFixed(1)} kg</span>
+                        </div>
+                        <div class="bg-indigo-50 p-3 rounded-xl border border-indigo-100">
+                            <span class="text-xs text-slate-500 block">Till Today Total</span>
+                            <span class="text-lg font-extrabold text-indigo-600">${tillTodayTotal.toFixed(1)} kg</span>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+            updateHeaderDate();
+        }
+
+        function renderPondList() {
+            const container = document.getElementById('pondCardsList');
+            const totalCountEl = document.getElementById('totalPondsCount');
+            if (totalCountEl) totalCountEl.innerText = `${ponds.length} Ponds Active`;
+            container.innerHTML = '';
+
+            const latestSystemDate = getSystemLatestDate();
+
+            ponds.forEach(p => {
+                const doc = calculateDOC(p.stockingDate, latestSystemDate);
+                const card = document.createElement('div');
+                card.className = 'bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-2.5';
+                card.innerHTML = `
+                    <div class="flex justify-between items-center border-b pb-2">
+                        <div class="flex items-center gap-2">
+                            <span class="bg-blue-600 text-white font-extrabold px-2.5 py-1 rounded-lg text-xs">${p.id}</span>
+                            <span class="text-xs text-slate-500 font-semibold">${p.length}m × ${p.breadth}m (${p.area.toLocaleString()} m²)</span>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <span class="text-sm font-black text-emerald-600">DOC ${doc}</span>
+                            <div class="flex items-center gap-2 pl-2 border-l border-slate-200">
+                                <button onclick="openPondModal('${p.id}')" class="text-slate-500 hover:text-blue-600 transition">✏️</button>
+                                <button onclick="deletePond('${p.id}')" class="text-slate-400 hover:text-rose-600 transition text-sm">🗑️</button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 text-xs">
+                        <div class="bg-slate-50 p-2 rounded-xl">
+                            <span class="text-slate-400 block text-[11px]">Stocking Date</span>
+                            <span class="font-bold text-slate-700">${formatDateDisplay(p.stockingDate)}</span>
+                        </div>
+                        <div class="bg-slate-50 p-2 rounded-xl">
+                            <span class="text-slate-400 block text-[11px]">Stocking Count</span>
+                            <span class="font-bold text-slate-700">${p.stockingCount ? p.stockingCount.toLocaleString() : 0} PL</span>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function renderHistory() {
+            const container = document.getElementById('feedHistoryList');
+            container.innerHTML = '';
+
+            let pondEntries = feedEntries.filter(item => item.pond === currentPond);
+            pondEntries.sort((a, b) => {
+                let dtA = getEntryTimestamp(a);
+                let dtB = getEntryTimestamp(b);
+                return sortDirection === 'desc' ? dtB - dtA : dtA - dtB;
+            });
+
+            let dates = [...new Set(pondEntries.map(e => e.date))];
+            dates.sort((d1, d2) => sortDirection === 'desc' ? new Date(d2) - new Date(d1) : new Date(d1) - new Date(d2));
+
+            dates.forEach(dateStr => {
+                const dateHeader = document.createElement('div');
+                dateHeader.className = 'text-xs font-bold text-slate-500 bg-slate-100 p-2 rounded mt-3 mb-2';
+                dateHeader.innerText = `(${currentPond}) ${dateStr}`;
+                container.appendChild(dateHeader);
+
+                const entriesForDate = pondEntries.filter(e => e.date === dateStr);
+                entriesForDate.sort((a, b) => {
+                    let dtA = getEntryTimestamp(a);
+                    let dtB = getEntryTimestamp(b);
+                    return sortDirection === 'desc' ? dtB - dtA : dtA - dtB;
+                });
+
+                entriesForDate.forEach(entry => {
+                    const row = document.createElement('div');
+                    row.className = 'flex justify-between items-start bg-white p-3 rounded-xl border border-slate-100 shadow-sm text-sm mb-2 gap-1';
+                    
+                    let feedContent = '';
+                    if (entry.fasting) {
+                        feedContent = `<span class="text-slate-500 font-semibold text-xs py-1 block">Fasting</span>`;
+                    } else {
+                        const feedHtml = (entry.feeds || []).map(f => `
+                            <div class="flex items-center justify-between bg-blue-50/60 border border-blue-100 px-2 py-1 rounded-lg mb-1">
+                                <span class="font-bold text-slate-700 text-xs">${f.code}</span>
+                                <span class="font-extrabold text-blue-600 text-xs whitespace-nowrap">${f.qty} kg</span>
+                            </div>
+                        `).join('');
+
+                        let suppHtml = '';
+                        if (entry.supplement && entry.supplement.code) {
+                            suppHtml = `
+                                <div class="flex items-center justify-between bg-amber-50/60 border border-amber-100 px-2 py-1 rounded-lg mb-1 gap-2">
+                                    <span class="font-bold text-amber-800 text-xs truncate max-w-[190px]">${entry.supplement.code} (${entry.supplement.dose})</span>
+                                    <span class="font-extrabold text-amber-600 text-xs whitespace-nowrap">${(entry.supplement.qty || 0).toFixed(2)}</span>
+                                </div>
+                            `;
+                        }
+                        feedContent = feedHtml + suppHtml;
+                    }
+
+                    row.innerHTML = `
+                        <div class="w-16 pt-1">
+                            <span class="font-semibold text-slate-700 text-xs block whitespace-nowrap">${entry.time}</span>
+                        </div>
+                        <div class="flex-1 pl-1 min-w-0">${feedContent}</div>
+                        <div class="w-14 pt-1 text-right">
+                            <span class="text-slate-600 text-xs font-semibold whitespace-nowrap">${(entry.cumulative || 0).toFixed(1)}</span>
+                        </div>
+                        <div class="w-5 pt-1 text-center text-blue-500">${entry.notes ? '💬' : ''}</div>
+                        <div class="w-14 pt-1 flex items-center justify-end gap-2 pr-1">
+                            <button onclick="openModal(${entry.id})" class="text-slate-500 hover:text-blue-600 transition">✏️</button>
+                            <button onclick="deleteFeed(${entry.id})" class="text-slate-400 hover:text-rose-600 transition text-sm">🗑️</button>
+                        </div>
+                    `;
+                    container.appendChild(row);
+                });
+            });
+            updateHeaderDate();
+        }
+
+        function renderSamplingList() {
+            const container = document.getElementById('samplingCardsList');
+            const totalCountEl = document.getElementById('totalSamplingCount');
+            container.innerHTML = '';
+
+            const filteredEntries = samplingPondFilter === 'ALL'
+                ? samplingEntries
+                : samplingEntries.filter(item => item.pond === samplingPondFilter);
+
+            if (totalCountEl) totalCountEl.innerText = `${filteredEntries.length} Records Logged`;
+
+            if (filteredEntries.length === 0) {
+                container.innerHTML = `<div class="bg-white p-6 rounded-2xl border border-slate-100 text-center text-slate-400 text-sm">No sampling records found.</div>`;
+                return;
+            }
+
+            const uniqueDates = [...new Set(filteredEntries.map(item => item.date))].sort((a, b) => new Date(b) - new Date(a));
+
+            uniqueDates.forEach((dateStr) => {
+                const entriesOnDate = filteredEntries.filter(item => item.date === dateStr);
+                const isLatestDate = (dateStr === uniqueDates[0]);
+
+                const dateSection = document.createElement('div');
+                dateSection.className = 'space-y-2.5';
+
+                dateSection.innerHTML = `
+                    <div class="flex justify-between items-center px-3 py-2 rounded-xl border ${isLatestDate ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-slate-200/80 text-slate-700 border-slate-300'}">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs">📅</span>
+                            <span class="text-xs font-black tracking-wide">${formatDateDisplay(dateStr)}</span>
+                            ${isLatestDate ? '<span class="text-[10px] bg-white text-blue-600 font-extrabold px-2 py-0.5 rounded-full shadow-xs">Latest</span>' : ''}
+                        </div>
+                        <span class="text-[11px] font-bold ${isLatestDate ? 'bg-blue-700/80 text-blue-100' : 'bg-white text-slate-600 border border-slate-300'} px-2.5 py-0.5 rounded-full">
+                            ${entriesOnDate.length} ${entriesOnDate.length === 1 ? 'Pond' : 'Ponds'}
+                        </span>
+                    </div>
+                `;
+
+                const cardsContainer = document.createElement('div');
+                cardsContainer.className = 'space-y-2 pl-1';
+
+                entriesOnDate.forEach(item => {
+                    const pondObj = ponds.find(p => p.id === item.pond);
+                    const doc = pondObj ? calculateDOC(pondObj.stockingDate, item.date) : '-';
+                    const growthInfo = getGrowthFromLastSample(item);
+
+                    let growthHtml = `<div class="bg-slate-50 p-2 rounded-xl border border-slate-100"><span class="text-[10px] text-slate-400 font-medium block">Growth</span><span class="font-bold text-slate-400 text-xs">--</span></div>`;
+                    if (growthInfo.hasPrev) {
+                        const isGain = growthInfo.diff >= 0;
+                        growthHtml = `<div class="${isGain ? 'bg-blue-50/70 border-blue-100 text-blue-700' : 'bg-rose-50 border-rose-100 text-rose-700'} p-2 rounded-xl border"><span class="text-[10px] block font-semibold">Growth</span><span class="font-extrabold text-xs">${growthInfo.text}</span></div>`;
+                    }
+
+                    const card = document.createElement('div');
+                    card.className = `bg-white p-3.5 rounded-2xl border ${isLatestDate ? 'border-blue-200 ring-1 ring-blue-100' : 'border-slate-200'} shadow-xs space-y-2.5`;
+                    card.innerHTML = `
+                        <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+                            <div class="flex items-center gap-2">
+                                <span class="bg-blue-600 text-white font-black px-2.5 py-1 rounded-lg text-xs">${item.pond}</span>
+                                <span class="text-[11px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded">DOC ${doc}</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button onclick="openSamplingModal(${item.id})" class="text-slate-500 hover:text-blue-600 transition">✏️</button>
+                                <button onclick="deleteSampling(${item.id})" class="text-slate-400 hover:text-rose-600 transition text-sm">🗑️</button>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-4 gap-1.5 text-center">
+                            <div class="bg-slate-50 p-2 rounded-xl border border-slate-100"><span class="text-[10px] text-slate-400 block font-medium">Sample Wt</span><span class="font-bold text-slate-700 text-xs">${item.sampleWeight} gm</span></div>
+                            <div class="bg-slate-50 p-2 rounded-xl border border-slate-100"><span class="text-[10px] text-slate-400 block font-medium">Count</span><span class="font-bold text-slate-700 text-xs">${item.count} pcs</span></div>
+                            <div class="bg-emerald-50/70 p-2 rounded-xl border border-emerald-100"><span class="text-[10px] text-emerald-600 font-semibold block">ABW</span><span class="font-extrabold text-emerald-700 text-xs">${parseFloat(item.abw).toFixed(2)} gm</span></div>
+                            ${growthHtml}
+                        </div>
+                        ${item.notes ? `<div class="text-xs text-slate-500 bg-slate-50/70 p-2 rounded-xl border border-slate-100 flex items-start gap-1.5"><span>💬</span><span class="italic">${item.notes}</span></div>` : ''}
+                    `;
+                    cardsContainer.appendChild(card);
+                });
+
+                dateSection.appendChild(cardsContainer);
+                container.appendChild(dateSection);
+            });
+        }
+
+        function renderTreatmentList() {
+            const container = document.getElementById('treatmentCardsList');
+            const totalCountEl = document.getElementById('totalTreatmentCount');
+            container.innerHTML = '';
+
+            const filteredEntries = treatmentPondFilter === 'ALL'
+                ? treatmentEntries
+                : treatmentEntries.filter(item => item.pond === treatmentPondFilter);
+
+            if (totalCountEl) totalCountEl.innerText = `${filteredEntries.length} Records Logged`;
+
+            if (filteredEntries.length === 0) {
+                container.innerHTML = `<div class="bg-white p-6 rounded-2xl border border-slate-100 text-center text-slate-400 text-sm">No treatment records found.</div>`;
+                return;
+            }
+
+            const uniqueDates = [...new Set(filteredEntries.map(item => item.date))].sort((a, b) => new Date(b) - new Date(a));
+
+            uniqueDates.forEach((dateStr) => {
+                const entriesOnDate = filteredEntries.filter(item => item.date === dateStr);
+                const isLatestDate = (dateStr === uniqueDates[0]);
+
+                const dateSection = document.createElement('div');
+                dateSection.className = 'space-y-2.5';
+                dateSection.innerHTML = `
+                    <div class="flex justify-between items-center px-3 py-2 rounded-xl border ${isLatestDate ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-slate-200/80 text-slate-700 border-slate-300'}">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs">📅</span>
+                            <span class="text-xs font-black tracking-wide">${formatDateDisplay(dateStr)}</span>
+                            ${isLatestDate ? '<span class="text-[10px] bg-white text-blue-600 font-extrabold px-2 py-0.5 rounded-full shadow-xs">Latest</span>' : ''}
+                        </div>
+                        <span class="text-[11px] font-bold ${isLatestDate ? 'bg-blue-700/80 text-blue-100' : 'bg-white text-slate-600 border border-slate-300'} px-2.5 py-0.5 rounded-full">
+                            ${entriesOnDate.length} Records
+                        </span>
+                    </div>
+                `;
+
+                const cardsContainer = document.createElement('div');
+                cardsContainer.className = 'space-y-2 pl-1';
+
+                entriesOnDate.forEach(item => {
+                    const pondObj = ponds.find(p => p.id === item.pond);
+                    const doc = pondObj ? calculateDOC(pondObj.stockingDate, item.date) : '-';
+                    const unit = item.unit || determineUnit(item.product);
+
+                    let catBadgeClass = 'text-emerald-700 bg-emerald-50 border-emerald-200';
+                    if (item.category === 'Medicine') catBadgeClass = 'text-rose-700 bg-rose-50 border-rose-200';
+                    else if (item.category === 'Fertilizers') catBadgeClass = 'text-amber-700 bg-amber-50 border-amber-200';
+
+                    const card = document.createElement('div');
+                    card.className = `bg-white p-3.5 rounded-2xl border ${isLatestDate ? 'border-blue-200 ring-1 ring-blue-100' : 'border-slate-200'} shadow-xs space-y-2.5`;
+                    card.innerHTML = `
+                        <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="bg-blue-600 text-white font-black px-2.5 py-1 rounded-lg text-xs">${item.pond}</span>
+                                <span class="text-[11px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded">DOC ${doc}</span>
+                                <span class="text-[11px] font-extrabold border px-2 py-0.5 rounded ${catBadgeClass}">${item.category || 'Probiotics'}</span>
+                                <span class="text-[11px] font-semibold text-purple-700 bg-purple-50 border border-purple-100 px-2 py-0.5 rounded truncate max-w-[120px]">${item.purpose}</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button onclick="openTreatmentModal(${item.id})" class="text-slate-500 hover:text-blue-600 transition">✏️</button>
+                                <button onclick="deleteTreatment(${item.id})" class="text-slate-400 hover:text-rose-600 transition text-sm">🗑️</button>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2 text-xs">
+                            <div class="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                                <span class="text-[10px] text-slate-400 block font-medium">Product / Chemical</span>
+                                <span class="font-bold text-slate-800 text-xs truncate block">${item.product}</span>
+                            </div>
+                            <div class="bg-blue-50/70 p-2 rounded-xl border border-blue-100 text-right">
+                                <span class="text-[10px] text-blue-600 font-semibold block">Dose Applied</span>
+                                <span class="font-extrabold text-blue-700 text-xs">${item.qty} ${unit}</span>
+                            </div>
+                        </div>
+                        ${item.notes ? `<div class="text-xs text-slate-500 bg-slate-50/70 p-2 rounded-xl border border-slate-100 flex items-start gap-1.5"><span>💬</span><span class="italic">${item.notes}</span></div>` : ''}
+                    `;
+                    cardsContainer.appendChild(card);
+                });
+
+                dateSection.appendChild(cardsContainer);
+                container.appendChild(dateSection);
+            });
+        }
+
+        function handleFormSubmit(e) {
+            e.preventDefault();
+            const date = document.getElementById('feedingDate').value;
+            const time = document.getElementById('selectedTimeString').innerText;
+            const fasting = document.querySelector('input[name="fasting"][value="Yes"]').checked;
+            const notes = document.getElementById('notes').value;
+
+            let feeds = [];
+            let supplement = null;
+            let totalQty = 0;
+
+            if (!fasting) {
+                document.querySelectorAll('#feedRowsContainer > div').forEach(row => {
+                    const code = row.querySelector('.feed-code-value').value;
+                    const qty = parseFloat(row.querySelector('.feed-qty-input').value) || 0;
+                    if (code && qty > 0) {
+                        feeds.push({ code, qty });
+                        totalQty += qty;
+                    }
+                });
+
+                if (feeds.length === 0) {
+                    alert('Please select at least one feed product and specify its quantity.');
+                    return;
+                }
+
+                const suppCode = document.getElementById('singleSuppCode').value;
+                const suppDose = parseFloat(document.getElementById('singleSuppDose').value) || 0;
+                if (suppCode && suppDose > 0) {
+                    supplement = { code: suppCode, dose: suppDose, qty: totalQty * suppDose };
+                }
+            }
+
+            const id = editingEntryId !== null ? editingEntryId : Date.now();
+            const entryObj = {
+                id,
+                pond: currentPond,
+                date,
+                time,
+                qty: totalQty,
+                cumulative: 0,
+                notes,
+                fasting,
+                feeds,
+                supplement
+            };
+
+            saveFeedToDb(entryObj);
+            closeModal();
+        }
+
+        function deleteFeed(id) {
+            if (confirm("Delete this feed record? This will update cloud data on both phones.")) {
+                deleteFeedFromDb(id);
+            }
+        }
+
+        function handleSamplingSubmit(e) {
+            e.preventDefault();
+            const date = document.getElementById('samplingDate').value;
+            const pond = document.getElementById('samplingPond').value;
+            const sampleWeight = parseFloat(document.getElementById('sampleWeight').value) || 0;
+            const count = parseInt(document.getElementById('sampleCount').value, 10) || 0;
+            const notes = document.getElementById('samplingNotes').value.trim();
+
+            if (count <= 0) {
+                alert("Please enter a valid count greater than zero.");
+                return;
+            }
+
+            const abw = parseFloat((sampleWeight / count).toFixed(2));
+            const id = editingSampleId !== null ? editingSampleId : Date.now();
+            const sampleObj = { id, date, pond, sampleWeight, count, abw, notes };
+
+            saveSamplingToDb(sampleObj);
+            closeSamplingModal();
+        }
+
+        function deleteSampling(id) {
+            if (confirm("Delete this sampling entry?")) {
+                deleteSamplingFromDb(id);
+            }
+        }
+
+        function handleTreatmentSubmit(e) {
+            e.preventDefault();
+            const date = document.getElementById('treatmentDate').value;
+            const pond = document.getElementById('treatmentPond').value;
+            const category = document.querySelector('input[name="treatmentCategory"]:checked')?.value || 'Probiotics';
+            const product = document.getElementById('treatmentProduct').value.trim();
+            const qty = parseFloat(document.getElementById('treatmentQty').value) || 0;
+            const unit = determineUnit(product);
+            const purpose = document.getElementById('treatmentPurpose').value;
+            const notes = document.getElementById('treatmentNotes').value.trim();
+
+            const id = editingTreatmentId !== null ? editingTreatmentId : Date.now();
+            const treatObj = { id, date, pond, category, product, qty, unit, purpose, notes };
+
+            saveTreatmentToDb(treatObj);
+            closeTreatmentModal();
+        }
+
+        function deleteTreatment(id) {
+            if (confirm("Delete this treatment record?")) {
+                deleteTreatmentFromDb(id);
+            }
+        }
+
+        function handlePondSubmit(e) {
+            e.preventDefault();
+            const name = document.getElementById('newPondName').value.trim().toUpperCase();
+            const length = parseFloat(document.getElementById('pondLength').value) || 0;
+            const breadth = parseFloat(document.getElementById('pondBreadth').value) || 0;
+            const area = length * breadth;
+            const stockingDate = document.getElementById('pondStockingDate').value;
+            const stockingCount = parseInt(document.getElementById('pondStockingCount').value, 10) || 0;
+
+            if (editingPondId !== null && name !== editingPondId && ponds.some(p => p.id === name)) {
+                alert(`Pond ${name} already exists.`);
+                return;
+            }
+
+            const pondObj = { id: name, length, breadth, area, stockingDate, stockingCount };
+            
+            if (editingPondId !== null && name !== editingPondId) {
+                deletePondFromDb(editingPondId);
+            }
+
+            savePondToDb(pondObj);
+            closePondModal();
+        }
+
+        function deletePond(pondId) {
+            if (confirm(`Delete ${pondId}? This will remove it from both devices.`)) {
+                deletePondFromDb(pondId);
+            }
+        }
+
+        function escapeCSV(val) {
+            if (val === null || val === undefined) return '""';
+            let str = String(val);
+            if (str.includes('"') || str.includes(',') || str.includes('\n')) {
+                str = '"' + str.replace(/"/g, '""') + '"';
+            }
+            return str;
+        }
+
+        function downloadCSVFile(csvContent, filename) {
+            const blob = new Blob(["\uFEFF" + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            link.href = URL.createObjectURL(blob);
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            setTimeout(() => { document.body.removeChild(link); }, 1000);
+        }
+
+        function exportFeedCSV() {
+            if (feedEntries.length === 0) return alert("No feed records to export.");
+            const headers = ["Entry ID", "Pond", "Date", "Time", "Fasting", "Feed Code", "Feed Qty (kg)", "Supplement Name", "Total Qty (gm)", "Cumulative Total (kg)", "Notes"];
+            const rows = [];
+            feedEntries.forEach(e => {
+                const sName = e.supplement?.code || "";
+                const sQty = e.supplement?.qty ? parseFloat(e.supplement.qty).toFixed(2) : "";
+                const cum = (parseFloat(e.cumulative) || 0).toFixed(1);
+                if (e.fasting || !e.feeds?.length) {
+                    rows.push([escapeCSV(e.id), escapeCSV(e.pond), escapeCSV(e.date), escapeCSV(e.time), escapeCSV("Yes"), escapeCSV(""), 0, escapeCSV(""), escapeCSV(""), escapeCSV(cum), escapeCSV(e.notes || "")].join(","));
+                } else {
+                    e.feeds.forEach((f, idx) => {
+                        rows.push([escapeCSV(e.id), escapeCSV(e.pond), escapeCSV(e.date), escapeCSV(e.time), escapeCSV("No"), escapeCSV(f.code), escapeCSV(f.qty), escapeCSV(idx === 0 ? sName : ""), escapeCSV(idx === 0 ? sQty : ""), escapeCSV(idx === 0 ? cum : ""), escapeCSV(idx === 0 ? e.notes || "" : "")].join(","));
+                    });
+                }
+            });
+            downloadCSVFile([headers.join(","), ...rows].join("\r\n"), `Feed_Backup_${new Date().toISOString().split('T')[0]}.csv`);
+        }
+
+        function exportSamplingCSV() {
+            const data = samplingPondFilter === 'ALL' ? samplingEntries : samplingEntries.filter(s => s.pond === samplingPondFilter);
+            if (!data.length) return alert("No sampling records to export.");
+            const headers = ["Sample ID", "Date", "Pond No", "Sample Weight (gm)", "Count (pcs)", "ABW (gm)", "Growth (gm)", "DOC", "Notes"];
+            const rows = data.map(s => {
+                const pondObj = ponds.find(p => p.id === s.pond);
+                return [escapeCSV(s.id), escapeCSV(s.date), escapeCSV(s.pond), escapeCSV(s.sampleWeight), escapeCSV(s.count), escapeCSV(s.abw?.toFixed(2)), escapeCSV(getGrowthFromLastSample(s).text), escapeCSV(pondObj ? calculateDOC(pondObj.stockingDate, s.date) : ""), escapeCSV(s.notes || "")].join(",");
+            });
+            downloadCSVFile([headers.join(","), ...rows].join("\r\n"), `Sampling_Backup_${new Date().toISOString().split('T')[0]}.csv`);
+        }
+
+        function exportTreatmentCSV() {
+            const data = treatmentPondFilter === 'ALL' ? treatmentEntries : treatmentEntries.filter(t => t.pond === treatmentPondFilter);
+            if (!data.length) return alert("No treatment records to export.");
+            const headers = ["Treatment ID", "Date", "Pond No", "Category", "Product Name", "Quantity", "Unit", "Purpose", "DOC", "Notes"];
+            const rows = data.map(t => {
+                const pondObj = ponds.find(p => p.id === t.pond);
+                return [escapeCSV(t.id), escapeCSV(t.date), escapeCSV(t.pond), escapeCSV(t.category || "Probiotics"), escapeCSV(t.product), escapeCSV(t.qty), escapeCSV(t.unit || determineUnit(t.product)), escapeCSV(t.purpose), escapeCSV(pondObj ? calculateDOC(pondObj.stockingDate, t.date) : ""), escapeCSV(t.notes || "")].join(",");
+            });
+            downloadCSVFile([headers.join(","), ...rows].join("\r\n"), `Treatment_Backup_${new Date().toISOString().split('T')[0]}.csv`);
+        }
+
+        function selectTreatmentCategory(cat, preserveValue = false) {
+            ['Probiotics', 'Medicine', 'Fertilizers'].forEach(c => {
+                const label = document.getElementById('catLabel' + c);
+                const radio = label.querySelector('input');
+                if (c === cat) {
+                    radio.checked = true;
+                    label.className = "flex items-center justify-center py-2 text-xs font-extrabold rounded-lg cursor-pointer transition text-center select-none bg-blue-600 text-white shadow-sm";
+                } else {
+                    label.className = "flex items-center justify-center py-2 text-xs font-extrabold rounded-lg cursor-pointer transition text-center select-none text-slate-600 hover:text-slate-900";
+                }
+            });
+            if (!preserveValue) {
+                document.getElementById('treatmentProduct').value = '';
+                document.getElementById('treatmentUnitBadge').innerText = 'Kg';
+            }
+            const listEl = document.getElementById('treatmentOptionsList');
+            if (listEl && !listEl.classList.contains('hidden')) filterTreatmentOptions('');
+        }
+
+        function openTreatmentDropdown() {
+            document.querySelectorAll('.feed-options-list').forEach(l => l.classList.add('hidden'));
+            document.getElementById('suppOptionsList')?.classList.add('hidden');
+            filterTreatmentOptions(document.getElementById('treatmentProduct').value);
+        }
+
+        function filterTreatmentOptions(q) {
+            const listEl = document.getElementById('treatmentOptionsList');
+            const cat = document.querySelector('input[name="treatmentCategory"]:checked')?.value || 'Probiotics';
+            const matches = (treatmentCatalog[cat] || []).filter(item => item.toLowerCase().includes((q || '').toLowerCase().trim()));
+            listEl.innerHTML = '';
+            if (!matches.length) {
+                listEl.innerHTML = `<div class="p-3 text-slate-400 text-center text-xs">No ${cat} products found</div>`;
+            } else {
+                matches.forEach(item => {
+                    const unit = determineUnit(item);
+                    const opt = document.createElement('div');
+                    opt.className = 'p-3 hover:bg-blue-50 active:bg-blue-100 cursor-pointer flex justify-between items-center transition border-b border-slate-50 last:border-0 select-none';
+                    opt.innerHTML = `<div class="font-bold text-slate-700 text-sm sm:text-xs">${item}</div><span class="text-[10px] font-extrabold px-2 py-0.5 rounded ${unit === 'Ltr' ? 'bg-cyan-50 text-cyan-700 border border-cyan-200' : 'bg-blue-50 text-blue-700 border border-blue-200'}">${unit}</span>`;
+                    opt.onclick = (e) => {
+                        e.preventDefault(); e.stopPropagation();
+                        document.getElementById('treatmentProduct').value = item;
+                        listEl.classList.add('hidden');
+                        const badge = document.getElementById('treatmentUnitBadge');
+                        if (badge) {
+                            badge.innerText = unit;
+                            badge.className = `absolute right-2 px-2.5 py-1 rounded text-xs font-black pointer-events-none border ${unit === 'Ltr' ? 'bg-cyan-50 text-cyan-700 border-cyan-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`;
+                        }
+                        document.getElementById('treatmentQty').focus();
+                    };
+                    listEl.appendChild(opt);
+                });
+            }
+            listEl.classList.remove('hidden');
+        }
+
+        function openTreatmentModal(id = null) {
+            syncPondDropdown();
+            document.getElementById('treatmentModal').classList.remove('hidden');
+            const modalTitle = document.getElementById('treatmentModalTitleText');
+            const submitBtn = document.getElementById('treatmentSubmitBtn');
+
+            if (id !== null) {
+                editingTreatmentId = id;
+                modalTitle.innerText = "Edit Treatment Entry";
+                submitBtn.innerText = "Update Treatment";
+                const treat = treatmentEntries.find(t => t.id === id);
+                if (treat) {
+                    document.getElementById('treatmentDate').value = treat.date;
+                    document.getElementById('treatmentPond').value = treat.pond;
+                    selectTreatmentCategory(treat.category || 'Probiotics', true);
+                    document.getElementById('treatmentProduct').value = treat.product;
+                    const unit = treat.unit || determineUnit(treat.product);
+                    const badge = document.getElementById('treatmentUnitBadge');
+                    if (badge) badge.innerText = unit;
+                    document.getElementById('treatmentQty').value = treat.qty;
+                    document.getElementById('treatmentPurpose').value = treat.purpose;
+                    document.getElementById('treatmentNotes').value = treat.notes || '';
+                }
+            } else {
+                editingTreatmentId = null;
+                modalTitle.innerText = "Add Pond Treatment";
+                submitBtn.innerText = "Save Treatment";
+                document.getElementById('treatmentForm').reset();
+                document.getElementById('treatmentDate').value = getSystemLatestDate();
+                selectTreatmentCategory('Probiotics', false);
+                document.getElementById('treatmentUnitBadge').innerText = 'Kg';
+                if (ponds.length > 0) document.getElementById('treatmentPond').value = currentPond || ponds[0].id;
+            }
+        }
+
+        function closeTreatmentModal() {
+            document.getElementById('treatmentModal').classList.add('hidden');
+            document.getElementById('treatmentOptionsList')?.classList.add('hidden');
+        }
+
+        function openSamplingModal(id = null) {
+            syncPondDropdown();
+            document.getElementById('samplingModal').classList.remove('hidden');
+            const modalTitle = document.getElementById('samplingModalTitleText');
+            const submitBtn = document.getElementById('samplingSubmitBtn');
+
+            if (id !== null) {
+                editingSampleId = id;
+                modalTitle.innerText = "Edit Sampling Entry";
+                submitBtn.innerText = "Update Sample";
+                const sample = samplingEntries.find(s => s.id === id);
+                if (sample) {
+                    document.getElementById('samplingDate').value = sample.date;
+                    document.getElementById('samplingPond').value = sample.pond;
+                    document.getElementById('sampleWeight').value = sample.sampleWeight;
+                    document.getElementById('sampleCount').value = sample.count;
+                    document.getElementById('samplingNotes').value = sample.notes || '';
+                    calcABW();
+                }
+            } else {
+                editingSampleId = null;
+                modalTitle.innerText = "Record Sampling Data";
+                submitBtn.innerText = "Save Sample";
+                document.getElementById('samplingForm').reset();
+                document.getElementById('samplingDate').value = getSystemLatestDate();
+                document.getElementById('sampleABW').value = '';
+                if (ponds.length > 0) document.getElementById('samplingPond').value = currentPond || ponds[0].id;
+            }
+        }
+
+        function closeSamplingModal() {
+            document.getElementById('samplingModal').classList.add('hidden');
+        }
+
+        function calcABW() {
+            const weight = parseFloat(document.getElementById('sampleWeight').value) || 0;
+            const count = parseInt(document.getElementById('sampleCount').value, 10) || 0;
+            document.getElementById('sampleABW').value = (weight > 0 && count > 0) ? (weight / count).toFixed(2) : '';
+        }
+
+        function openPondModal(pondId = null) {
+            document.getElementById('pondModal').classList.remove('hidden');
+            const modalTitle = document.getElementById('pondModalTitleText');
+            const submitBtn = document.getElementById('pondModalSubmitBtn');
+
+            if (pondId !== null) {
+                editingPondId = pondId;
+                modalTitle.innerText = `Edit Pond (${pondId})`;
+                submitBtn.innerText = 'Update Pond';
+                const p = ponds.find(item => item.id === pondId);
+                if (p) {
+                    document.getElementById('newPondName').value = p.id;
+                    document.getElementById('pondLength').value = p.length;
+                    document.getElementById('pondBreadth').value = p.breadth;
+                    calcPondArea();
+                    document.getElementById('pondStockingDate').value = p.stockingDate;
+                    document.getElementById('pondStockingCount').value = p.stockingCount;
+                }
+            } else {
+                editingPondId = null;
+                modalTitle.innerText = 'Create New Pond';
+                submitBtn.innerText = 'Save Pond';
+                document.getElementById('pondForm').reset();
+                document.getElementById('pondArea').value = '';
+                document.getElementById('newPondName').value = 'P' + (ponds.length + 1);
+                document.getElementById('pondStockingDate').value = getSystemLatestDate();
+            }
+        }
+
+        function closePondModal() {
+            document.getElementById('pondModal').classList.add('hidden');
+        }
+
+        function calcPondArea() {
+            const length = parseFloat(document.getElementById('pondLength').value) || 0;
+            const breadth = parseFloat(document.getElementById('pondBreadth').value) || 0;
+            const area = length * breadth;
+            document.getElementById('pondArea').value = area > 0 ? area.toFixed(1) + ' m²' : '';
+        }
+
+        function openModal(id = null) {
+            document.getElementById('feedModal').classList.remove('hidden');
+            const modalTitle = document.getElementById('modalTitleText');
+            document.getElementById('modalSubtitle').innerText = `Farm: Elite Aqualines 2026 C2 | ${currentPond}`;
+
+            if (id !== null) {
+                editingEntryId = id;
+                modalTitle.innerText = `Edit Feed Data (${currentPond})`;
+                const entry = feedEntries.find(e => e.id === id);
+                if (entry) {
+                    document.getElementById('feedingDate').value = entry.date;
+                    const parts = entry.time.split(' ');
+                    const hm = parts[0].split(':');
+                    selectedHour = parseInt(hm[0], 10);
+                    selectedMinute = parseInt(hm[1], 10);
+                    period = parts[1] || 'AM';
+                    updateDigitalDisplay();
+
+                    if (entry.fasting) {
+                        document.querySelector('input[name="fasting"][value="Yes"]').checked = true;
+                        toggleFasting(true);
+                    } else {
+                        document.querySelector('input[name="fasting"][value="No"]').checked = true;
+                        toggleFasting(false);
+                        const container = document.getElementById('feedRowsContainer');
+                        container.innerHTML = '';
+                        (entry.feeds || []).forEach(f => addFeedRow(f.code, f.qty));
+                        if (entry.supplement?.code) {
+                            document.getElementById('singleSuppCode').value = entry.supplement.code;
+                            document.getElementById('singleSuppSearchInput').value = entry.supplement.code;
+                            document.getElementById('singleSuppDose').value = entry.supplement.dose || '';
+                        } else {
+                            document.getElementById('singleSuppCode').value = '';
+                            document.getElementById('singleSuppSearchInput').value = '';
+                            document.getElementById('singleSuppDose').value = '';
+                        }
+                        updateSupplementCalculations();
+                    }
+                    document.getElementById('notes').value = entry.notes || '';
+                }
+            } else {
+                editingEntryId = null;
+                modalTitle.innerText = `Add Feed Data (${currentPond})`;
+                const now = new Date();
+                document.getElementById('feedingDate').value = now.toISOString().split('T')[0];
+                selectedHour = now.getHours();
+                period = selectedHour >= 12 ? 'PM' : 'AM';
+                selectedHour = selectedHour % 12 || 12;
+                selectedMinute = now.getMinutes();
+                updateDigitalDisplay();
+                document.getElementById('feedRowsContainer').innerHTML = '';
+                addFeedRow();
+                document.getElementById('singleSuppCode').value = '';
+                document.getElementById('singleSuppSearchInput').value = '';
+                document.getElementById('singleSuppDose').value = '';
+                document.getElementById('singleSuppCalcQty').value = '';
+                document.getElementById('notes').value = '';
+                document.querySelector('input[name="fasting"][value="No"]').checked = true;
+                toggleFasting(false);
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('feedModal').classList.add('hidden');
+        }
+
+        function openFeedDropdown(inputEl) {
+            document.querySelectorAll('.feed-options-list').forEach(l => l.classList.add('hidden'));
+            document.getElementById('suppOptionsList')?.classList.add('hidden');
+            document.getElementById('treatmentOptionsList')?.classList.add('hidden');
+            document.querySelectorAll('.feed-row-item').forEach(r => r.style.zIndex = '1');
+            const currentRow = inputEl.closest('.feed-row-item');
+            if (currentRow) currentRow.style.zIndex = '40';
+            filterFeedOptions(inputEl);
+        }
+
+        function filterFeedOptions(inputEl) {
+            const dropdown = inputEl.closest('.feed-searchable-dropdown');
+            const listEl = dropdown.querySelector('.feed-options-list');
+            const query = inputEl.value.toLowerCase().trim();
+            const matches = availableFeedCodes.filter(f => f.code.toLowerCase().includes(query) || f.name.toLowerCase().includes(query));
+            listEl.innerHTML = '';
+            if (!matches.length) {
+                listEl.innerHTML = `<div class="p-3 text-slate-400 text-center text-xs">No matching feed product</div>`;
+            } else {
+                matches.forEach(item => {
+                    const opt = document.createElement('div');
+                    opt.className = 'p-3 hover:bg-blue-50 active:bg-blue-100 cursor-pointer flex justify-between items-center transition border-b border-slate-50 last:border-0 select-none';
+                    opt.innerHTML = `<div class="font-bold text-slate-700 text-sm sm:text-xs">${item.name}</div>`;
+                    opt.onclick = (e) => {
+                        e.preventDefault(); e.stopPropagation();
+                        dropdown.querySelector('.feed-code-value').value = item.code;
+                        dropdown.querySelector('.feed-search-input').value = item.name;
+                        listEl.classList.add('hidden');
+                        const parentRow = dropdown.closest('.feed-row-item');
+                        if (parentRow) parentRow.style.zIndex = '1';
+                        parentRow?.querySelector('.feed-qty-input')?.focus();
+                        updateSupplementCalculations();
+                    };
+                    listEl.appendChild(opt);
+                });
+            }
+            listEl.classList.remove('hidden');
+        }
+
+        function openSuppDropdown() {
+            document.querySelectorAll('.feed-options-list').forEach(l => l.classList.add('hidden'));
+            document.getElementById('treatmentOptionsList')?.classList.add('hidden');
+            document.getElementById('supplementProductsSection').style.zIndex = '35';
+            filterSuppOptions(document.getElementById('singleSuppSearchInput').value);
+        }
+
+        function filterSuppOptions(query) {
+            const listEl = document.getElementById('suppOptionsList');
+            const q = (query || '').toLowerCase().trim();
+            const matches = availableSupplements.filter(s => s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q));
+            listEl.innerHTML = '';
+            const clearOpt = document.createElement('div');
+            clearOpt.className = 'p-3 hover:bg-amber-100/60 active:bg-amber-100 cursor-pointer text-slate-400 italic text-xs border-b border-slate-100 select-none';
+            clearOpt.innerHTML = '<span>🚫</span> No Supplement (Clear)';
+            clearOpt.onclick = (e) => {
+                e.preventDefault(); e.stopPropagation();
+                document.getElementById('singleSuppCode').value = '';
+                document.getElementById('singleSuppSearchInput').value = '';
+                document.getElementById('singleSuppDose').value = '';
+                document.getElementById('singleSuppCalcQty').value = '';
+                listEl.classList.add('hidden');
+                updateSupplementCalculations();
+            };
+            listEl.appendChild(clearOpt);
+
+            matches.forEach(item => {
+                const opt = document.createElement('div');
+                opt.className = 'p-3 hover:bg-amber-50 active:bg-amber-100 cursor-pointer flex justify-between items-center transition border-b border-slate-50 last:border-0 select-none';
+                opt.innerHTML = `<div class="font-bold text-slate-700 text-sm sm:text-xs">${item.name}</div>`;
+                opt.onclick = (e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    document.getElementById('singleSuppCode').value = item.code;
+                    document.getElementById('singleSuppSearchInput').value = item.name;
+                    listEl.classList.add('hidden');
+                    document.getElementById('supplementProductsSection').style.zIndex = '10';
+                    document.getElementById('singleSuppDose').focus();
+                    updateSupplementCalculations();
+                };
+                listEl.appendChild(opt);
+            });
+            listEl.classList.remove('hidden');
+        }
+
+        function addFeedRow(preselectCode = '', preselectQty = '') {
+            const container = document.getElementById('feedRowsContainer');
+            if (container.children.length >= 2) return alert('Maximum 2 feed codes can be mixed per session.');
+            const idx = container.children.length;
+            const display = availableFeedCodes.find(f => f.code === preselectCode)?.name || '';
+
+            const row = document.createElement('div');
+            row.className = 'feed-row-item flex gap-2 items-center bg-slate-50 p-2 rounded-lg border border-slate-200 relative';
+            row.style.zIndex = '1';
+            row.innerHTML = `
+                <div class="relative w-7/12 feed-searchable-dropdown">
+                    <input type="hidden" class="feed-code-value" value="${preselectCode}" required>
+                    <div class="relative flex items-center">
+                        <input type="text" class="feed-search-input w-full border border-slate-200 p-2.5 sm:p-2 pr-6 rounded text-sm sm:text-xs bg-white outline-none focus:ring-1 focus:ring-blue-500 font-medium text-slate-700" placeholder="Tap to pick feed..." value="${display}" autocomplete="off" onfocus="openFeedDropdown(this)" onclick="openFeedDropdown(this)" oninput="filterFeedOptions(this)">
+                        <span class="absolute right-2 text-slate-400 pointer-events-none text-[10px]">▼</span>
+                    </div>
+                    <div class="feed-options-list dropdown-scroll-list absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-2xl z-50 hidden divide-y divide-slate-100"></div>
+                </div>
+                <input type="number" step="0.1" placeholder="Qty (kg)" value="${preselectQty}" class="feed-qty-input w-4/12 border border-slate-200 p-2.5 sm:p-2 rounded text-sm sm:text-xs bg-white outline-none focus:ring-1 focus:ring-blue-500 font-bold text-slate-700" required oninput="updateSupplementCalculations()" />
+                ${idx > 0 ? `<button type="button" onclick="this.parentElement.remove(); updateSupplementCalculations();" class="text-rose-500 font-bold px-2 text-base">×</button>` : ''}
+            `;
+            container.appendChild(row);
+            updateSupplementCalculations();
+        }
+
+        function updateSupplementCalculations() {
+            let total = 0;
+            document.querySelectorAll('#feedRowsContainer > div').forEach(r => total += parseFloat(r.querySelector('.feed-qty-input')?.value) || 0);
+            const dose = parseFloat(document.getElementById('singleSuppDose').value) || 0;
+            const suppCode = document.getElementById('singleSuppCode').value;
+            document.getElementById('singleSuppCalcQty').value = (suppCode && dose > 0 && total > 0) ? (total * dose).toFixed(2) : '';
+        }
+
+        function toggleFasting(isFasting) {
+            document.getElementById('feedProductsSection').style.display = isFasting ? 'none' : 'block';
+            document.getElementById('supplementProductsSection').style.display = isFasting ? 'none' : 'block';
+        }
+
+        function openClockPicker() { document.getElementById('clockModal').classList.remove('hidden'); switchClockMode('hour'); }
+        function closeClockPicker() { document.getElementById('clockModal').classList.add('hidden'); }
+        function switchClockMode(mode) {
+            clockMode = mode;
+            document.getElementById('digitalHourBox').className = mode === 'hour' ? "px-4 py-2 rounded-xl text-3xl font-bold bg-blue-600 text-white shadow-md transition" : "px-4 py-2 rounded-xl text-3xl font-bold text-slate-600 hover:bg-slate-200 transition";
+            document.getElementById('digitalMinuteBox').className = mode === 'minute' ? "px-4 py-2 rounded-xl text-3xl font-bold bg-blue-600 text-white shadow-md transition" : "px-4 py-2 rounded-xl text-3xl font-bold text-slate-600 hover:bg-slate-200 transition";
+            mode === 'hour' ? renderClockHours() : renderClockMinutes();
+        }
+        function setAmPm(p) {
+            period = p;
+            document.getElementById('amBtn').className = period === 'AM' ? "px-3 py-2 bg-slate-800 text-white transition" : "px-3 py-2 bg-white text-slate-600 hover:bg-slate-100 transition";
+            document.getElementById('pmBtn').className = period === 'PM' ? "px-3 py-2 bg-slate-800 text-white transition" : "px-3 py-2 bg-white text-slate-600 hover:bg-slate-100 transition";
+        }
+        function updateDigitalDisplay() {
+            const h = String(selectedHour).padStart(2, '0');
+            const m = String(selectedMinute).padStart(2, '0');
+            document.getElementById('digitalHourBox').innerText = h;
+            document.getElementById('digitalMinuteBox').innerText = m;
+            document.getElementById('selectedTimeString').innerText = `${h}:${m} ${period}`;
+        }
+        function updateClockHand(idx, total) {
+            const angle = (idx * (360 / total)) * (Math.PI / 180);
+            const x = 128 + 72 * Math.sin(angle);
+            const y = 128 - 72 * Math.cos(angle);
+            document.getElementById('clockHandLine').setAttribute('x2', x);
+            document.getElementById('clockHandLine').setAttribute('y2', y);
+            document.getElementById('clockHandDot').setAttribute('cx', x);
+            document.getElementById('clockHandDot').setAttribute('cy', y);
+        }
+        function renderClockHours() {
+            const face = document.getElementById('clockFace');
+            face.querySelectorAll('button').forEach(b => b.remove());
+            [12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11].forEach((h, i) => {
+                const angle = (i * 30) * (Math.PI / 180);
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = `absolute w-9 h-9 rounded-full text-sm font-bold flex items-center justify-center transition ${selectedHour === h ? 'bg-blue-600 text-white shadow-lg scale-110' : 'text-slate-700 hover:bg-blue-50'}`;
+                btn.style.left = `${128 + 82 * Math.sin(angle) - 16}px`;
+                btn.style.top = `${128 - 82 * Math.cos(angle) - 16}px`;
+                btn.innerText = h;
+                btn.onclick = () => { selectedHour = h; updateDigitalDisplay(); updateClockHand(i, 12); switchClockMode('minute'); };
+                face.appendChild(btn);
+                if (selectedHour === h) updateClockHand(i, 12);
+            });
+        }
+        function renderClockMinutes() {
+            const face = document.getElementById('clockFace');
+            face.querySelectorAll('button').forEach(b => b.remove());
+            [0, 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55].forEach((m, i) => {
+                const angle = (i * 30) * (Math.PI / 180);
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = `absolute w-9 h-9 rounded-full text-xs font-bold flex items-center justify-center transition ${selectedMinute === m ? 'bg-blue-600 text-white shadow-lg scale-110' : 'text-slate-700 hover:bg-blue-50'}`;
+                btn.style.left = `${128 + 82 * Math.sin(angle) - 16}px`;
+                btn.style.top = `${128 - 82 * Math.cos(angle) - 16}px`;
+                btn.innerText = String(m).padStart(2, '0');
+                btn.onclick = () => { selectedMinute = m; updateDigitalDisplay(); updateClockHand(i, 12); };
+                face.appendChild(btn);
+            });
+            updateClockHand(Math.round(selectedMinute / 5) % 12, 12);
+        }
+        function confirmClockTime() { updateDigitalDisplay(); closeClockPicker(); }
+
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.feed-searchable-dropdown')) {
+                document.querySelectorAll('.feed-options-list').forEach(l => l.classList.add('hidden'));
+                document.querySelectorAll('.feed-row-item').forEach(r => r.style.zIndex = '1');
+            }
+            if (!e.target.closest('.supp-searchable-dropdown')) {
+                document.getElementById('suppOptionsList')?.classList.add('hidden');
+                const s = document.getElementById('supplementProductsSection');
+                if (s) s.style.zIndex = '10';
+            }
+            if (!e.target.closest('.treatment-searchable-dropdown')) {
+                document.getElementById('treatmentOptionsList')?.classList.add('hidden');
+            }
+        });
+    </script>
+</body>
+</html>
