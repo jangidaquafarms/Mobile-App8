@@ -199,11 +199,15 @@
                     <span class="text-xs font-bold text-slate-500 uppercase">Feed Logs</span>
                     <div class="flex items-center gap-1.5">
                         <button onclick="exportFeedCSV()" class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200 hover:bg-emerald-100 transition shadow-xs flex items-center gap-1" title="Backup Feed Logs to CSV">
-                            <span>📥</span> Backup
-                        </button>
-                        <button onclick="toggleSortOrder()" id="sortBtnText" class="text-xs font-semibold text-blue-600 bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-100 hover:bg-blue-100 transition shadow-xs">
-                            Latest First ↓
-                        </button>
+                        <span>📥</span> Backup
+                    </button>
+                    <button onclick="document.getElementById('feedRestoreInput').click()" class="text-xs font-semibold text-blue-700 bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-200 hover:bg-blue-100 transition shadow-xs flex items-center gap-1" title="Restore Feed Logs from CSV">
+                        <span>📤</span> Restore
+                    </button>
+                    <input type="file" id="feedRestoreInput" accept=".csv" class="hidden" onchange="importFeedCSV(event)">
+                    <button onclick="toggleSortOrder()" id="sortBtnText" class="text-xs font-semibold text-blue-600 bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-100 hover:bg-blue-100 transition shadow-xs">
+                        Latest First ↓
+                    </button>
                     </div>
                 </div>
 
@@ -240,6 +244,10 @@
                     <button onclick="exportSamplingCSV()" class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200 hover:bg-emerald-100 transition shadow-xs flex items-center gap-1" title="Backup Sampling Logs to CSV">
                         <span>📥</span> Backup
                     </button>
+                    <button onclick="document.getElementById('samplingRestoreInput').click()" class="text-xs font-semibold text-blue-700 bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-200 hover:bg-blue-100 transition shadow-xs flex items-center gap-1" title="Restore Sampling Logs from CSV">
+    <span>📤</span> Restore
+</button>
+<input type="file" id="samplingRestoreInput" accept=".csv" class="hidden" onchange="importSamplingCSV(event)">
                 </div>
 
                 <div id="samplingCardsList" class="space-y-4"></div>
@@ -1633,7 +1641,118 @@
             });
             downloadCSVFile([headers.join(","), ...rows].join("\r\n"), `Sampling_Backup_${new Date().toISOString().split('T')[0]}.csv`);
         }
+function parseCSVLine(text) {
+            const result = [];
+            let cur = '';
+            let inQuotes = false;
+            for (let i = 0; i < text.length; i++) {
+                const c = text[i];
+                if (c === '"') {
+                    if (inQuotes && text[i + 1] === '"') {
+                        cur += '"';
+                        i++;
+                    } else {
+                        inQuotes = !inQuotes;
+                    }
+                } else if (c === ',' && !inQuotes) {
+                    result.push(cur.trim());
+                    cur = '';
+                } else {
+                    cur += c;
+                }
+            }
+            result.push(cur.trim());
+            return result;
+        }
 
+        function importFeedCSV(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const lines = e.target.result.split(/\r?\n/).filter(line => line.trim() !== '');
+                if (lines.length <= 1) {
+                    alert('File is empty or invalid.');
+                    return;
+                }
+
+                const grouped = {};
+                for (let i = 1; i < lines.length; i++) {
+                    const cols = parseCSVLine(lines[i]);
+                    if (cols.length < 5) continue;
+
+                    const id = parseInt(cols[0], 10) || Date.now() + i;
+                    const pond = cols[1];
+                    const date = cols[2];
+                    const time = cols[3];
+                    const isFasting = cols[4].toLowerCase() === 'yes';
+                    const feedCode = cols[5] || '';
+                    const feedQty = parseFloat(cols[6]) || 0;
+                    const suppCode = cols[7] || '';
+                    const suppQty = parseFloat(cols[8]) || 0;
+                    const notes = cols[10] || '';
+
+                    if (!grouped[id]) {
+                        grouped[id] = {
+                            id,
+                            pond,
+                            date,
+                            time,
+                            fasting: isFasting,
+                            feeds: [],
+                            supplement: suppCode ? { code: suppCode, qty: suppQty, dose: 0 } : null,
+                            qty: 0,
+                            notes,
+                            cumulative: 0
+                        };
+                    }
+
+                    if (!isFasting && feedCode && feedQty > 0) {
+                        grouped[id].feeds.push({ code: feedCode, qty: feedQty });
+                        grouped[id].qty += feedQty;
+                    }
+                }
+
+                Object.values(grouped).forEach(entry => saveFeedToDb(entry));
+                event.target.value = '';
+                alert('Feed records restored successfully!');
+            };
+            reader.readAsText(file);
+        }
+
+        function importSamplingCSV(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const lines = e.target.result.split(/\r?\n/).filter(line => line.trim() !== '');
+                if (lines.length <= 1) {
+                    alert('File is empty or invalid.');
+                    return;
+                }
+
+                for (let i = 1; i < lines.length; i++) {
+                    const cols = parseCSVLine(lines[i]);
+                    if (cols.length < 6) continue;
+
+                    const id = parseInt(cols[0], 10) || Date.now() + i;
+                    const date = cols[1];
+                    const pond = cols[2];
+                    const sampleWeight = parseFloat(cols[3]) || 0;
+                    const count = parseInt(cols[4], 10) || 0;
+                    const abw = parseFloat(cols[5]) || (count > 0 ? sampleWeight / count : 0);
+                    const notes = cols[8] || '';
+
+                    saveSamplingToDb({ id, date, pond, sampleWeight, count, abw, notes });
+                }
+
+                event.target.value = '';
+                alert('Sampling records restored successfully!');
+            };
+            reader.readAsText(file);
+        }
         function exportTreatmentCSV() {
             const data = treatmentPondFilter === 'ALL' ? treatmentEntries : treatmentEntries.filter(t => t.pond === treatmentPondFilter);
             if (!data.length) return alert("No treatment records to export.");
