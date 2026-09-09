@@ -2089,6 +2089,37 @@
             if (pondSelect) {
                 pondSelect.innerHTML = '<option value="">Select Active Pond</option>';
 
+                // 1. Try to clone options directly from your working Sampling dropdown
+                const sampleDropdown = document.querySelector('#samplingModal select, #sampleModal select, select[id*="sample" i], select[id*="sampling" i]');
+                
+                if (sampleDropdown && sampleDropdown.options.length > 1) {
+                    Array.from(sampleDropdown.options).forEach(opt => {
+                        if (opt.value && opt.value.toLowerCase() !== 'all' && opt.value !== '') {
+                            const newOpt = document.createElement('option');
+                            newOpt.value = opt.value;
+                            newOpt.textContent = opt.textContent;
+                            pondSelect.appendChild(newOpt);
+                        }
+                    });
+                } 
+                // 2. Fallback: Read directly from your in-memory ponds list
+                else if (typeof ponds !== 'undefined' && Array.isArray(ponds) && ponds.length > 0) {
+                    ponds.forEach(p => {
+                        const name = typeof p === 'object' ? (p.name || p.pondNo || p.id) : p;
+                        const opt = document.createElement('option');
+                        opt.value = name;
+                        opt.textContent = isNaN(name) ? name : `Pond ${name}`;
+                        pondSelect.appendChild(opt);
+                    });
+                }
+            }
+
+            document.getElementById('waterModal').classList.remove('hidden');
+        }
+            const pondSelect = document.getElementById('waterPondInput');
+            if (pondSelect) {
+                pondSelect.innerHTML = '<option value="">Select Active Pond</option>';
+
                 // 1. Fetch ponds from saved data
                 const savedPonds = JSON.parse(localStorage.getItem('ponds') || '[]');
                 
