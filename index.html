@@ -2128,88 +2128,76 @@ function openWaterModal() {
             renderWaterList();
         }
 
-        function renderWaterList() {
-            const listEl = document.getElementById('waterRecordsList');
-            if (!listEl) return;
-            const records = JSON.parse(localStorage.getItem('waterRecords') || '[]');
+       function renderWaterList() {
+    const listEl = document.getElementById('waterRecordsList');
+    if (!listEl) return;
+    const records = JSON.parse(localStorage.getItem('waterRecords') || '[]');
 
-            if (records.length === 0) {
-                listEl.innerHTML = '<div class="text-center py-6 text-xs text-slate-400 font-medium">No water quality records logged yet.</div>';
-                return;
-            }
+    if (records.length === 0) {
+        listEl.innerHTML = '<div class="text-center py-6 text-xs text-slate-400 font-medium">No water quality records logged yet.</div>';
+        return;
+    }
 
-            listEl.innerHTML = records.map(r => {
-                const phNum = parseFloat(r.ph);
-                const isPhAlert = !isNaN(phNum) && (phNum < 7.5 || phNum > 8.5);
+    // Updates top overview pH card to red if out of range
+    const latest = records[0];
+    const topPhBox = document.querySelector('#waterView .grid-cols-2 > div:nth-child(2)');
+    if (topPhBox && latest) {
+        const latestPh = parseFloat(latest.ph);
+        const isAlert = !isNaN(latestPh) && (latestPh < 7.5 || latestPh > 8.5);
+        topPhBox.innerHTML = `
+            <span class="text-[10px] font-bold uppercase ${isAlert ? 'text-rose-500' : 'text-slate-400'}">pH Level</span>
+            <div class="text-lg font-black mt-0.5" style="color: ${isAlert ? '#dc2626' : '#334155'} !important;">
+                ${latest.ph} ${isAlert ? '<span class="text-[10px] font-bold uppercase text-rose-500 bg-rose-100 px-1.5 py-0.5 rounded ml-1">Alert</span>' : ''}
+            </div>
+        `;
+        topPhBox.style.backgroundColor = isAlert ? '#fef2f2' : '#f8fafc';
+        topPhBox.style.borderColor = isAlert ? '#fecaca' : '#f1f5f9';
+    }
 
-                const phBoxClass = isPhAlert ? 'bg-rose-50 border border-rose-200' : 'bg-slate-50 border border-slate-100';
-                const phTextClass = isPhAlert ? 'text-rose-600 font-black' : 'text-slate-700 font-black';
-                const phLabelClass = isPhAlert ? 'text-rose-500 font-bold' : 'text-slate-400 font-bold';
+    listEl.innerHTML = records.map(r => {
+        const phNum = parseFloat(r.ph);
+        const isPhAlert = !isNaN(phNum) && (phNum < 7.5 || phNum > 8.5);
 
-                return `
-                    <div class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm space-y-2">
-                        <div class="flex justify-between items-center">
-                            <span class="text-xs font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg">Pond ${r.pond}</span>
-                            <span class="text-[10px] text-slate-400 font-semibold">${r.timestamp}</span>
-                        </div>
-                        <div class="grid grid-cols-4 gap-2 pt-1 text-center">
-                            <div class="bg-slate-50 p-2 rounded-xl border border-slate-100">
-                                <span class="text-[9px] text-slate-400 font-bold block">DO</span>
-                                <span class="text-xs font-black text-slate-700">${r.doVal}</span>
-                            </div>
-                            <div class="${phBoxClass} p-2 rounded-xl transition">
-                                <span class="text-[9px] ${phLabelClass} block">pH</span>
-                                <span class="text-xs ${phTextClass}">${r.ph}</span>
-                            </div>
-                            <div class="bg-slate-50 p-2 rounded-xl border border-slate-100">
-                                <span class="text-[9px] text-slate-400 font-bold block">SALINITY</span>
-                                <span class="text-xs font-black text-slate-700">${r.salinity}</span>
-                            </div>
-                            <div class="bg-slate-50 p-2 rounded-xl border border-slate-100">
-                                <span class="text-[9px] text-slate-400 font-bold block">NH3/TAN</span>
-                                <span class="text-xs font-black text-slate-700">${r.ammonia}</span>
-                            </div>
-                        </div>
+        const alertBoxStyle = isPhAlert 
+            ? 'background-color: #fef2f2 !important; border: 1px solid #fecaca !important;' 
+            : 'background-color: #f8fafc; border: 1px solid #f1f5f9;';
+
+        const alertTextStyle = isPhAlert 
+            ? 'color: #dc2626 !important; font-weight: 900 !important;' 
+            : 'color: #334155; font-weight: 900;';
+
+        const alertLabelStyle = isPhAlert 
+            ? 'color: #e11d48 !important; font-weight: 800;' 
+            : 'color: #94a3b8; font-weight: 700;';
+
+        return `
+            <div class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm space-y-2">
+                <div class="flex justify-between items-center">
+                    <span class="text-xs font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg">Pond ${r.pond}</span>
+                    <span class="text-[10px] text-slate-400 font-semibold">${r.timestamp}</span>
+                </div>
+                <div class="grid grid-cols-4 gap-2 pt-1 text-center">
+                    <div class="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                        <span class="text-[9px] text-slate-400 font-bold block">DO</span>
+                        <span class="text-xs font-black text-slate-700">${r.doVal}</span>
                     </div>
-                `;
-            }).join('');
-        }
-            const listEl = document.getElementById('waterRecordsList');
-            if (!listEl) return;
-            const records = JSON.parse(localStorage.getItem('waterRecords') || '[]');
-
-            if (records.length === 0) {
-                listEl.innerHTML = '<div class="text-center py-6 text-xs text-slate-400 font-medium">No water quality records logged yet.</div>';
-                return;
-            }
-
-            listEl.innerHTML = records.map(r => `
-                <div class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm space-y-2">
-                    <div class="flex justify-between items-center">
-                        <span class="text-xs font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg">Pond ${r.pond}</span>
-                        <span class="text-[10px] text-slate-400 font-semibold">${r.timestamp}</span>
+                    <div class="p-2 rounded-xl transition" style="${alertBoxStyle}">
+                        <span class="text-[9px] block" style="${alertLabelStyle}">pH</span>
+                        <span class="text-xs" style="${alertTextStyle}">${r.ph}</span>
                     </div>
-                    <div class="grid grid-cols-4 gap-2 pt-1 text-center">
-                        <div class="bg-slate-50 p-2 rounded-xl">
-                            <span class="text-[9px] text-slate-400 font-bold block">DO</span>
-                            <span class="text-xs font-black text-slate-700">${r.doVal}</span>
-                        </div>
-                        <div class="bg-slate-50 p-2 rounded-xl">
-                            <span class="text-[9px] text-slate-400 font-bold block">pH</span>
-                            <span class="text-xs font-black text-slate-700">${r.ph}</span>
-                        </div>
-                        <div class="bg-slate-50 p-2 rounded-xl">
-                            <span class="text-[9px] text-slate-400 font-bold block">SALINITY</span>
-                            <span class="text-xs font-black text-slate-700">${r.salinity}</span>
-                        </div>
-                        <div class="bg-slate-50 p-2 rounded-xl">
-                            <span class="text-[9px] text-slate-400 font-bold block">NH3/TAN</span>
-                            <span class="text-xs font-black text-slate-700">${r.ammonia}</span>
-                        </div>
+                    <div class="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                        <span class="text-[9px] text-slate-400 font-bold block">SALINITY</span>
+                        <span class="text-xs font-black text-slate-700">${r.salinity}</span>
+                    </div>
+                    <div class="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                        <span class="text-[9px] text-slate-400 font-bold block">NH3/TAN</span>
+                        <span class="text-xs font-black text-slate-700">${r.ammonia}</span>
                     </div>
                 </div>
-            `).join('');
-        }
+            </div>
+        `;
+    }).join('');
+}
     </script>
     <!-- Water Quality Entry Modal -->
     <div id="waterModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9998] hidden flex items-center justify-center p-4">
