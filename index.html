@@ -276,6 +276,10 @@
                     <button onclick="exportTreatmentCSV()" class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200 hover:bg-emerald-100 transition shadow-xs flex items-center gap-1" title="Backup Treatment Logs to CSV">
                         <span>📥</span> Backup
                     </button>
+                    <button type="button" onclick="document.getElementById('treatmentRestoreInput').click()" class="text-xs font-semibold text-blue-700 bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-200 hover:bg-blue-100 transition shadow-xs flex items-center gap-1 cursor-pointer" title="Restore Treatment Logs from CSV">
+    <span>📤</span> Restore
+</button>
+<input type="file" id="treatmentRestoreInput" accept=".csv" class="hidden" onchange="importTreatmentCSV(event)">
                 </div>
 
                 <div id="treatmentCardsList" class="space-y-4"></div>
@@ -1872,7 +1876,46 @@ function parseCSVLine(text) {
             });
             downloadCSVFile([headers.join(","), ...rows].join("\r\n"), `Treatment_Backup_${new Date().toISOString().split('T')[0]}.csv`);
         }
+function importTreatmentCSV(event) {
+    const file = event.target.files[0];
+    if (!file) return;
 
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        const lines = e.target.result.split(/\r?\n/).filter(line => line.trim() !== '');
+        if (lines.length <= 1) {
+            alert('File is empty or invalid.');
+            return;
+        }
+
+        const confirmRestore = confirm(`Found ${lines.length - 1} treatment record(s). Restore to database?`);
+        if (!confirmRestore) {
+            event.target.value = '';
+            return;
+        }
+
+        for (let i = 1; i < lines.length; i++) {
+            const cols = parseCSVLine(lines[i]);
+            if (cols.length < 6) continue;
+
+            const id = parseInt(cols[0], 10) || Date.now() + i;
+            const date = cols[1];
+            const pond = cols[2];
+            const category = cols[3] || 'Probiotics';
+            const product = cols[4] || '';
+            const qty = parseFloat(cols[5]) || 0;
+            const unit = cols[6] || determineUnit(product);
+            const purpose = cols[7] || 'Other';
+            const notes = cols[9] || '';
+
+            saveTreatmentToDb({ id, date, pond, category, product, qty, unit, purpose, notes });
+        }
+
+        event.target.value = '';
+        alert('Treatment records restored successfully!');
+    };
+    reader.readAsText(file);
+}
         function selectTreatmentCategory(cat, preserveValue = false) {
             ['Probiotics', 'Medicine', 'Fertilizers'].forEach(c => {
                 const label = document.getElementById('catLabel' + c);
