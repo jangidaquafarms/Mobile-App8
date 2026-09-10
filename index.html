@@ -364,7 +364,20 @@
 
       <!-- Past Harvest Records -->
       <div class="space-y-2">
-        <h3 class="text-xs font-bold text-slate-500 uppercase px-1">Recent Harvest Logs</h3>
+       <div class="flex justify-between items-center px-1">
+          <h3 class="text-xs font-bold text-slate-500 uppercase">Recent Harvest Logs</h3>
+          <div class="flex items-center gap-1.5">
+            <!-- Backup Button -->
+            <button type="button" onclick="backupHarvestData()" class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200 hover:bg-emerald-100 transition flex items-center gap-1">
+              <span>📥</span> Backup
+            </button>
+            <!-- Restore Button -->
+            <label class="text-xs font-semibold text-blue-700 bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-200 hover:bg-blue-100 transition flex items-center gap-1 cursor-pointer mb-0">
+              <span>📤</span> Restore
+              <input type="file" id="harvestRestoreFile" accept=".csv" onchange="restoreHarvestData(event)" class="hidden">
+            </label>
+          </div>
+        </div>
         <div id="harvestRecordsList" class="space-y-2">
           <div class="text-center py-6 text-xs text-slate-400 font-medium">No harvest records saved yet.</div>
         </div>
@@ -2426,7 +2439,148 @@ function renderWaterList(records = []) {
         `;
     }).join('');
 }
+// ==========================================
+// HARVEST CSV BACKUP & RESTORE
+// ==========================================
 
+// 1. Export all harvest records to a .csv spreadsheet
+async function backupHarvestData() {
+    try {
+        const snapshot = await db.collection('harvestRecords').orderBy('date', 'desc').get();
+        if (snapshot.empty) {
+            alert("No harvest records found to back up.");
+            return;
+        }
+
+        const headers = [
+            "ID",
+            "Date",
+            "Pond",
+            "Type",
+            "Biomass_kg",
+            "Count_pcs_per_kg",
+            "Price_per_kg",
+            "Feed_Consumed_kg",
+            "ABW_g",
+            "Total_Pieces",
+            "Total_Value_INR"
+        ];
+
+        const rows = snapshot.docs.map(doc => {
+            const d = doc.data();
+            return [
+                `"${doc.id}"`,
+                `"${d.date || ''}"`,
+                `"${d.pond || ''}"`,
+                `"${d.type || 'Partial Harvest'}"`,
+                d.biomass || 0,
+                d.count || 0,
+                d.price || 0,
+                d.feedConsumed || 0,
+                d.abw || 0,
+                d.totalPieces || 0,
+                d.totalValue || 0
+            ].join(',');
+        });
+
+        const csvContent = [headers.join(','), ...rows].join('\r\n');
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        
+        const downloadAnchor = document.createElement('a');
+        const today = new Date().toISOString().split('T')[0];
+        downloadAnchor.setAttribute("href", url);
+        downloadAnchor.setAttribute("download", `harvest_records_${today}.csv`);
+        document.body.appendChild(downloadAnchor);
+        downloadAnchor.click();
+        downloadAnchor.remove();
+        URL.revokeObjectURL(url);
+    } catch (err) {
+        console.error("CSV Backup error:", err);
+        alert("Failed to export CSV: " + err.message);
+    }
+}
+
+// 2. Parse uploaded .csv file and restore records into Firestore
+async function restoreHarvestData(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async function(e) {
+        try {
+            const text = e.target.result;
+            const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
+
+            if (lines.length < 2) {
+                alert("CSV file is empty or missing data rows.");
+                return;
+            }
+
+            const parseCSVLine = (line) => {
+                const values = [];
+                let current = '';
+                let inQuotes = false;
+                for (let i = 0; i < line.length; i++) {
+                    const char = line[i];
+                    if (char === '"') {
+                        inQuotes = !inQuotes;
+                    } else if (char === ',' && !inQuotes) {
+                        values.push(current.trim().replace(/^"|"$/g, ''));
+                        current = '';
+                    } else {
+                        current += char;
+                    }
+                }
+                values.push(current.trim().replace(/^"|"$/g, ''));
+                return values;
+            };
+
+            const dataRows = lines.slice(1);
+            const confirmRestore = confirm(`Found ${dataRows.length} harvest record(s) in CSV. Restore to database?`);
+            if (!confirmRestore) {
+                event.target.value = '';
+                return;
+            }
+
+            const batch = db.batch();
+
+            dataRows.forEach(rowStr => {
+                const cols = parseCSVLine(rowStr);
+                if (cols.length < 7) return;
+
+                const [id, date, pond, type, biomass, count, price, feedConsumed, abw, totalPieces, totalValue] = cols;
+
+                const docRef = (id && id.trim() !== '') 
+                    ? db.collection('harvestRecords').doc(id.trim()) 
+                    : db.collection('harvestRecords').doc();
+
+                batch.set(docRef, {
+                    date: date || '',
+                    pond: pond || '',
+                    type: type || 'Partial Harvest',
+                    biomass: parseFloat(biomass) || 0,
+                    count: parseFloat(count) || 0,
+                    price: parseFloat(price) || 0,
+                    feedConsumed: parseFloat(feedConsumed) || 0,
+                    abw: parseFloat(abw) || (parseFloat(count) > 0 ? parseFloat((1000 / parseFloat(count)).toFixed(2)) : 0),
+                    totalPieces: parseInt(totalPieces) || Math.round((parseFloat(biomass) || 0) * (parseFloat(count) || 0)),
+                    totalValue: parseInt(totalValue) || Math.round((parseFloat(biomass) || 0) * (parseFloat(price) || 0)),
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+            });
+
+            await batch.commit();
+            alert(`Successfully restored records from CSV!`);
+        } catch (err) {
+            console.error("CSV Restore error:", err);
+            alert("Failed to restore CSV: " + err.message);
+        } finally {
+            event.target.value = '';
+        }
+    };
+    reader.readAsText(file);
+}
 // Automatically start listening immediately
 listenToWaterRecords();
         // ==========================================
