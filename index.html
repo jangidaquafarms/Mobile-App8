@@ -15,6 +15,21 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <style>
+        /* View-Only Mode: Hide Add, Edit, Delete, and Restore controls */
+        body.view-only-mode button[onclick*="openPondModal"],
+        body.view-only-mode button[onclick*="openWaterModal"],
+        body.view-only-mode button[onclick*="openModal"],
+        body.view-only-mode button[onclick*="openSamplingModal"],
+        body.view-only-mode button[onclick*="openTreatmentModal"],
+        body.view-only-mode button[onclick*="delete"],
+        body.view-only-mode button[onclick*="Restore"],
+        body.view-only-mode button[onclick*="restore"],
+        body.view-only-mode button[onclick*="import"],
+        body.view-only-mode label:has(input[accept*="csv"]),
+        body.view-only-mode #harvestForm,
+        body.view-only-mode #bottomActionBar {
+            display: none !important;
+        }
         @media screen and (max-width: 768px) {
             input, select, textarea {
                 font-size: 16px !important;
@@ -725,15 +740,16 @@
             appId: "1:958454959822:web:b291de038e674b933f4a9f"
         };
 
-        const FIXED_USER_EMAIL = "jangidaquafarms@gmail.com";
+        const ADMIN_EMAIL = "jangidaquafarms@gmail.com";
+        const VIEWER_EMAIL = "viewer@jangidaquafarms.com";
 
         let db = null;
         let isFirebaseConnected = false;
         let isSyncInitialized = false;
+        let isViewOnly = false;
 
         try {
             firebase.initializeApp(firebaseConfig);
-            // Persistent session across all future tabs & browser restarts
             firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
             db = firebase.firestore();
             db.enablePersistence({ synchronizeTabs: true }).catch(err => {
@@ -759,31 +775,52 @@
                 authStatus.className = "text-xs font-semibold mt-3 min-h-[18px] text-blue-600";
 
                 try {
-                    await firebase.auth().signInWithEmailAndPassword(FIXED_USER_EMAIL, pin);
+                    // 1. Check Admin PIN first
+                    await firebase.auth().signInWithEmailAndPassword(ADMIN_EMAIL, pin);
                     authStatus.textContent = "";
                     pinInput.value = "";
-                } catch (err) {
-                    authStatus.textContent = "Incorrect PIN. Try again.";
-                    authStatus.className = "text-xs font-semibold mt-3 min-h-[18px] text-rose-600";
-                    pinInput.value = "";
+                } catch (adminErr) {
+                    try {
+                        // 2. If Admin PIN fails, check Viewer PIN
+                        await firebase.auth().signInWithEmailAndPassword(VIEWER_EMAIL, pin);
+                        authStatus.textContent = "";
+                        pinInput.value = "";
+                    } catch (viewerErr) {
+                        authStatus.textContent = "Incorrect PIN. Try again.";
+                        authStatus.className = "text-xs font-semibold mt-3 min-h-[18px] text-rose-600";
+                        pinInput.value = "";
+                    }
                 }
             }
         });
 
-        // Instant session detection (remembers previous login)
+        // Instant session detection
         firebase.auth().onAuthStateChanged((user) => {
             authLoading.classList.add('hidden');
 
             if (user) {
-                // User already entered PIN in the past -> Skip directly to App
                 authScreen.classList.add('hidden');
                 mainApp.classList.remove('hidden');
+
+                if (user.email === VIEWER_EMAIL) {
+                    isViewOnly = true;
+                    document.body.classList.add('view-only-mode');
+                    
+                    const statusBadge = document.getElementById('syncStatusBadge');
+                    if (statusBadge) {
+                        statusBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400"></span> View Only`;
+                        statusBadge.className = "text-xs font-extrabold bg-amber-600/90 px-2 py-1 rounded-full border border-amber-400/40 text-white flex items-center gap-1";
+                    }
+                } else {
+                    isViewOnly = false;
+                    document.body.classList.remove('view-only-mode');
+                }
+
                 if (!isSyncInitialized) {
                     isSyncInitialized = true;
                     initRealtimeSync();
                 }
             } else {
-                // New device or logged out -> Show PIN screen
                 authScreen.classList.remove('hidden');
                 mainApp.classList.add('hidden');
                 pinInput.value = "";
