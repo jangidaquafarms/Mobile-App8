@@ -2225,39 +2225,52 @@ function openWaterModal() {
         function closeWaterModal() {
             document.getElementById('waterModal').classList.add('hidden');
         }
+// 1. Cloud Save
+async function saveWaterRecord(e) {
+    e.preventDefault();
+    const record = {
+        pond: document.getElementById('waterPondInput').value,
+        doVal: document.getElementById('waterDOInput').value || '--',
+        ph: document.getElementById('waterPHInput').value || '--',
+        salinity: document.getElementById('waterSalinityInput').value || '--',
+        ammonia: document.getElementById('waterAmmoniaInput').value || '--',
+        temp: document.getElementById('waterTempInput').value || '--',
+        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+        timestamp: new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
 
-        function saveWaterRecord(e) {
-            e.preventDefault();
-            const record = {
-                pond: document.getElementById('waterPondInput').value,
-                doVal: document.getElementById('waterDOInput').value || '--',
-                ph: document.getElementById('waterPHInput').value || '--',
-                salinity: document.getElementById('waterSalinityInput').value || '--',
-                ammonia: document.getElementById('waterAmmoniaInput').value || '--',
-                temp: document.getElementById('waterTempInput').value || '--',
-                timestamp: new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-            };
+    try {
+        await db.collection('waterRecords').add(record);
+        closeWaterModal();
+        e.target.reset();
+    } catch (err) {
+        console.error("Error saving water reading to Firestore:", err);
+        alert("Failed to save to cloud: " + err.message);
+    }
+}
 
-            let records = JSON.parse(localStorage.getItem('waterRecords') || '[]');
-            records.unshift(record);
-            localStorage.setItem('waterRecords', JSON.stringify(records));
+// 2. Real-Time Listener
+function listenToWaterRecords() {
+    db.collection('waterRecords')
+      .orderBy('createdAt', 'desc')
+      .onSnapshot((snapshot) => {
+          const records = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          renderWaterList(records);
+      }, (error) => {
+          console.error("Firestore water listener error:", error);
+      });
+}
 
-            closeWaterModal();
-            e.target.reset();
-            renderWaterList();
-        }
-
-       function renderWaterList() {
+// 3. Render List with Red pH Alert (< 7.5 or > 8.5)
+function renderWaterList(records = []) {
     const listEl = document.getElementById('waterRecordsList');
     if (!listEl) return;
-    const records = JSON.parse(localStorage.getItem('waterRecords') || '[]');
 
     if (records.length === 0) {
         listEl.innerHTML = '<div class="text-center py-6 text-xs text-slate-400 font-medium">No water quality records logged yet.</div>';
         return;
     }
 
-    // Updates top overview pH card to red if out of range
     const latest = records[0];
     const topPhBox = document.querySelector('#waterView .grid-cols-2 > div:nth-child(2)');
     if (topPhBox && latest) {
@@ -2293,7 +2306,7 @@ function openWaterModal() {
             <div class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm space-y-2">
                 <div class="flex justify-between items-center">
                     <span class="text-xs font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg">Pond ${r.pond}</span>
-                    <span class="text-[10px] text-slate-400 font-semibold">${r.timestamp}</span>
+                    <span class="text-[10px] text-slate-400 font-semibold">${r.timestamp || ''}</span>
                 </div>
                 <div class="grid grid-cols-4 gap-2 pt-1 text-center">
                     <div class="bg-slate-50 p-2 rounded-xl border border-slate-100">
@@ -2317,6 +2330,9 @@ function openWaterModal() {
         `;
     }).join('');
 }
+
+// Automatically start listening immediately
+listenToWaterRecords();
     </script>
     <!-- Water Quality Entry Modal -->
     <div id="waterModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9998] hidden flex items-center justify-center p-4">
