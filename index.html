@@ -1174,9 +1174,7 @@
                     viewEl.classList.add('hidden');
                 }
             });
-if (tab === 'harvest') {
-        populateHarvestPonds();
-    }
+
             if (tab === 'feed') {
                 bottomBar.classList.remove('hidden');
                 headerPondSection.classList.remove('hidden');
@@ -1193,6 +1191,10 @@ if (tab === 'harvest') {
                 if (tab === 'water') renderWaterList();
                 if (tab === 'sampling') renderSamplingList();
                 if (tab === 'treatment') renderTreatmentList();
+                if (tab === 'harvest') {
+            populateHarvestPonds();
+            renderHarvestList();
+        }
             }
             updateHeaderDate();
         }
@@ -2427,6 +2429,165 @@ function renderWaterList(records = []) {
 
 // Automatically start listening immediately
 listenToWaterRecords();
+        // ==========================================
+// HARVEST TAB JAVASCRIPT LOGIC
+// ==========================================
+
+// 1. Calculate ABW (1000 / Count), Pieces, and Final Value
+window.calcHarvestMetrics = function() {
+    const countInput = document.getElementById('harvestCount');
+    const biomassInput = document.getElementById('harvestBiomass');
+    const priceInput = document.getElementById('harvestPrice');
+
+    const count = countInput ? parseFloat(countInput.value) : 0;
+    const biomass = biomassInput ? parseFloat(biomassInput.value) : 0;
+    const price = priceInput ? parseFloat(priceInput.value) : 0;
+
+    // Harvest ABW = 1000 / Count
+    const abw = (count > 0) ? (1000 / count).toFixed(2) + ' g' : '—';
+    const pieces = (biomass > 0 && count > 0) ? Math.round(biomass * count).toLocaleString('en-IN') : '—';
+    const val = (biomass > 0 && price > 0) ? '₹' + Math.round(biomass * price).toLocaleString('en-IN') : '₹0';
+
+    const abwEl = document.getElementById('liveHarvestAbw');
+    const piecesEl = document.getElementById('liveHarvestPieces');
+    const valEl = document.getElementById('liveHarvestValue');
+
+    if (abwEl) abwEl.textContent = abw;
+    if (piecesEl) piecesEl.textContent = pieces;
+    if (valEl) valEl.textContent = val;
+};
+
+function resetHarvestForm() {
+    const abwEl = document.getElementById('liveHarvestAbw');
+    const piecesEl = document.getElementById('liveHarvestPieces');
+    const valEl = document.getElementById('liveHarvestValue');
+    if (abwEl) abwEl.textContent = '—';
+    if (piecesEl) piecesEl.textContent = '—';
+    if (valEl) valEl.textContent = '₹0';
+}
+
+// 2. Fetch Ponds (Clones from your working waterPondInput dropdown)
+function populateHarvestPonds() {
+    const select = document.getElementById('harvestPond');
+    if (!select) return;
+    select.innerHTML = '<option value="">Select Pond</option>';
+
+    const donor = document.getElementById('waterPondInput') || document.getElementById('treatmentPondSelect');
+    if (donor && donor.options.length > 1) {
+        Array.from(donor.options).forEach(opt => {
+            if (opt.value && opt.value !== '') {
+                const newOpt = document.createElement('option');
+                newOpt.value = opt.value;
+                newOpt.textContent = opt.textContent;
+                select.appendChild(newOpt);
+            }
+        });
+        return;
+    }
+
+    if (typeof ponds !== 'undefined' && Array.isArray(ponds)) {
+        ponds.forEach(p => {
+            const val = typeof p === 'object' ? (p.id || p.name) : p;
+            if (val) {
+                const opt = document.createElement('option');
+                opt.value = val;
+                opt.textContent = val.toString().startsWith('Pond') ? val : `Pond ${val}`;
+                select.appendChild(opt);
+            }
+        });
+    }
+}
+
+// 3. Save Harvest Event to Firestore
+async function saveHarvestEvent(e) {
+    e.preventDefault();
+    const biomass = parseFloat(document.getElementById('harvestBiomass').value) || 0;
+    const count = parseFloat(document.getElementById('harvestCount').value) || 0;
+    const price = parseFloat(document.getElementById('harvestPrice').value) || 0;
+    const feed = parseFloat(document.getElementById('harvestTotalFeed').value) || 0;
+
+    const record = {
+        pond: document.getElementById('harvestPond').value,
+        date: document.getElementById('harvestDate').value,
+        type: document.getElementById('harvestType').value,
+        biomass: biomass,
+        count: count,
+        price: price,
+        feedConsumed: feed,
+        abw: count > 0 ? parseFloat((1000 / count).toFixed(2)) : 0,
+        totalPieces: Math.round(biomass * count),
+        totalValue: Math.round(biomass * price),
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    try {
+        await db.collection('harvestRecords').add(record);
+        e.target.reset();
+        resetHarvestForm();
+        alert("Harvest record saved successfully!");
+    } catch (err) {
+        console.error("Error saving harvest log:", err);
+        alert("Failed to save harvest log: " + err.message);
+    }
+}
+
+// 4. Real-time Firestore Listener
+function listenToHarvestRecords() {
+    if (typeof db === 'undefined') return;
+    db.collection('harvestRecords')
+      .orderBy('date', 'desc')
+      .onSnapshot(snapshot => {
+          const records = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+          renderHarvestList(records);
+      }, err => {
+          console.error("Harvest listener error:", err);
+      });
+}
+
+function renderHarvestList(records = []) {
+    const listEl = document.getElementById('harvestRecordsList');
+    if (!listEl) return;
+
+    if (records.length === 0) {
+        listEl.innerHTML = '<div class="text-center py-6 text-xs text-slate-400 font-medium">No harvest records saved yet.</div>';
+        return;
+    }
+
+    listEl.innerHTML = records.map(r => `
+        <div class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm space-y-2">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center gap-1.5">
+                    <span class="text-xs font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg">Pond ${r.pond}</span>
+                    <span class="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg">${r.type}</span>
+                </div>
+                <span class="text-xs font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg">₹${(r.totalValue || 0).toLocaleString('en-IN')}</span>
+            </div>
+            <div class="grid grid-cols-4 gap-2 pt-1 text-center">
+                <div class="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                    <span class="text-[9px] text-slate-400 font-bold block">BIOMASS</span>
+                    <span class="text-xs font-black text-slate-700">${r.biomass} kg</span>
+                </div>
+                <div class="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                    <span class="text-[9px] text-slate-400 font-bold block">COUNT</span>
+                    <span class="text-xs font-black text-slate-700">${r.count} pc</span>
+                </div>
+                <div class="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                    <span class="text-[9px] text-slate-400 font-bold block">ABW</span>
+                    <span class="text-xs font-black text-slate-700">${r.abw}g</span>
+                </div>
+                <div class="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                    <span class="text-[9px] text-slate-400 font-bold block">RATE</span>
+                    <span class="text-xs font-black text-slate-700">₹${r.price}</span>
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+// 5. Initialize
+listenToHarvestRecords();
+const defaultHarvestDate = document.getElementById('harvestDate');
+if (defaultHarvestDate) defaultHarvestDate.value = new Date().toISOString().split('T')[0];
     </script>
     <!-- Water Quality Entry Modal -->
     <div id="waterModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9998] hidden flex items-center justify-center p-4">
