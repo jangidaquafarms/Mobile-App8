@@ -937,8 +937,14 @@
             }
 
             if (statusEl) {
+            if (isViewOnly) {
+                statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400"></span> View Only`;
+                statusEl.className = "text-xs font-extrabold bg-amber-600/90 px-2 py-1 rounded-full border border-amber-400/40 text-white flex items-center gap-1";
+            } else {
                 statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Cloud Sync`;
+                statusEl.className = "text-xs font-extrabold bg-emerald-600/90 px-2 py-1 rounded-full border border-emerald-400/40 text-white flex items-center gap-1";
             }
+        }
 
             // Sync Ponds
             db.collection('ponds').onSnapshot(snap => {
