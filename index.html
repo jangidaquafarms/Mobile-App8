@@ -107,14 +107,15 @@
                 </div>
             </div>
 
-            <!-- Navigation Tabs -->
+            <!-- Navigation Tabs (Added Harvest Tab) -->
             <div class="bg-white border-b border-slate-200">
                 <div class="max-w-md mx-auto flex justify-between text-sm font-medium text-slate-500 px-2 overflow-x-auto no-scrollbar">
-                    <button onclick="switchTab('home')" id="tabHome" class="py-3 px-2.5 text-blue-600 border-b-2 border-blue-600 font-semibold whitespace-nowrap">Home</button>
-                    <button onclick="switchTab('pond')" id="tabPond" class="py-3 px-2.5 hover:text-blue-600 font-medium whitespace-nowrap">Pond</button>
-                    <button onclick="switchTab('feed')" id="tabFeed" class="py-3 px-2.5 hover:text-blue-600 font-medium whitespace-nowrap">Feed</button>
-                    <button onclick="switchTab('sampling')" id="tabSampling" class="py-3 px-2.5 hover:text-blue-600 font-medium whitespace-nowrap">Sampling</button>
-                    <button onclick="switchTab('treatment')" id="tabTreatment" class="py-3 px-2.5 hover:text-blue-600 font-medium whitespace-nowrap">Treatment</button>
+                    <button onclick="switchTab('home')" id="tabHome" class="py-3 px-2 text-blue-600 border-b-2 border-blue-600 font-semibold whitespace-nowrap">Home</button>
+                    <button onclick="switchTab('pond')" id="tabPond" class="py-3 px-2 hover:text-blue-600 font-medium whitespace-nowrap">Pond</button>
+                    <button onclick="switchTab('feed')" id="tabFeed" class="py-3 px-2 hover:text-blue-600 font-medium whitespace-nowrap">Feed</button>
+                    <button onclick="switchTab('sampling')" id="tabSampling" class="py-3 px-2 hover:text-blue-600 font-medium whitespace-nowrap">Sampling</button>
+                    <button onclick="switchTab('treatment')" id="tabTreatment" class="py-3 px-2 hover:text-blue-600 font-medium whitespace-nowrap">Treatment</button>
+                    <button onclick="switchTab('harvest')" id="tabHarvest" class="py-3 px-2 hover:text-blue-600 font-medium whitespace-nowrap">Harvest</button>
                 </div>
             </div>
         </div>
@@ -122,12 +123,12 @@
         <!-- Scrollable Main Content Area -->
         <div class="flex-1 overflow-y-auto max-w-md w-full mx-auto p-4 pb-28">
             
-            <!-- 1. Home View Container -->
+            <!-- 1. Home View -->
             <div id="homeView" class="space-y-4">
                 <div class="space-y-4" id="allPondsDashboardContainer"></div>
             </div>
 
-            <!-- 2. Pond View Container -->
+            <!-- 2. Pond View -->
             <div id="pondView" class="hidden space-y-4">
                 <div class="flex justify-between items-center bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
                     <div>
@@ -141,7 +142,7 @@
                 <div id="pondCardsList" class="space-y-3"></div>
             </div>
 
-            <!-- 3. Feed View Container -->
+            <!-- 3. Feed View -->
             <div id="feedView" class="hidden space-y-3">
                 <div class="flex justify-between items-center bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
                     <div>
@@ -156,6 +157,12 @@
                 <div class="flex justify-between items-center bg-white p-2.5 rounded-xl border border-slate-100 shadow-sm gap-2">
                     <span class="text-xs font-bold text-slate-500 uppercase">Feed Logs</span>
                     <div class="flex items-center gap-1.5">
+                        <!-- Restore Button -->
+                        <button onclick="document.getElementById('feedRestoreInput').click()" class="text-xs font-semibold text-purple-700 bg-purple-50 px-2.5 py-1.5 rounded-lg border border-purple-200 hover:bg-purple-100 transition shadow-xs flex items-center gap-1" title="Restore Feed Logs from CSV">
+                            <span>📤</span> Restore
+                        </button>
+                        <input type="file" id="feedRestoreInput" accept=".csv" class="hidden" onchange="importFeedCSV(event)">
+
                         <button onclick="exportFeedCSV()" class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200 hover:bg-emerald-100 transition shadow-xs flex items-center gap-1" title="Backup Feed Logs to CSV">
                             <span>📥</span> Backup
                         </button>
@@ -176,7 +183,7 @@
                 <div id="feedHistoryList" class="space-y-3"></div>
             </div>
 
-            <!-- 4. Sampling View Container -->
+            <!-- 4. Sampling View -->
             <div id="samplingView" class="hidden space-y-4">
                 <div class="flex justify-between items-center bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
                     <div>
@@ -195,15 +202,23 @@
                             <option value="ALL">All Ponds</option>
                         </select>
                     </div>
-                    <button onclick="exportSamplingCSV()" class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200 hover:bg-emerald-100 transition shadow-xs flex items-center gap-1" title="Backup Sampling Logs to CSV">
-                        <span>📥</span> Backup
-                    </button>
+                    <div class="flex items-center gap-1.5">
+                        <!-- Restore Button -->
+                        <button onclick="document.getElementById('samplingRestoreInput').click()" class="text-xs font-semibold text-purple-700 bg-purple-50 px-2.5 py-1.5 rounded-lg border border-purple-200 hover:bg-purple-100 transition shadow-xs flex items-center gap-1" title="Restore Sampling Logs from CSV">
+                            <span>📤</span> Restore
+                        </button>
+                        <input type="file" id="samplingRestoreInput" accept=".csv" class="hidden" onchange="importSamplingCSV(event)">
+
+                        <button onclick="exportSamplingCSV()" class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200 hover:bg-emerald-100 transition shadow-xs flex items-center gap-1" title="Backup Sampling Logs to CSV">
+                            <span>📥</span> Backup
+                        </button>
+                    </div>
                 </div>
 
                 <div id="samplingCardsList" class="space-y-4"></div>
             </div>
 
-            <!-- 5. Treatment View Container -->
+            <!-- 5. Treatment View -->
             <div id="treatmentView" class="hidden space-y-4">
                 <div class="flex justify-between items-center bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
                     <div>
@@ -222,12 +237,54 @@
                             <option value="ALL">All Ponds</option>
                         </select>
                     </div>
-                    <button onclick="exportTreatmentCSV()" class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200 hover:bg-emerald-100 transition shadow-xs flex items-center gap-1" title="Backup Treatment Logs to CSV">
-                        <span>📥</span> Backup
-                    </button>
+                    <div class="flex items-center gap-1.5">
+                        <!-- Restore Button -->
+                        <button onclick="document.getElementById('treatmentRestoreInput').click()" class="text-xs font-semibold text-purple-700 bg-purple-50 px-2.5 py-1.5 rounded-lg border border-purple-200 hover:bg-purple-100 transition shadow-xs flex items-center gap-1" title="Restore Treatment Logs from CSV">
+                            <span>📤</span> Restore
+                        </button>
+                        <input type="file" id="treatmentRestoreInput" accept=".csv" class="hidden" onchange="importTreatmentCSV(event)">
+
+                        <button onclick="exportTreatmentCSV()" class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200 hover:bg-emerald-100 transition shadow-xs flex items-center gap-1" title="Backup Treatment Logs to CSV">
+                            <span>📥</span> Backup
+                        </button>
+                    </div>
                 </div>
 
                 <div id="treatmentCardsList" class="space-y-4"></div>
+            </div>
+
+            <!-- 6. Harvest View -->
+            <div id="harvestView" class="hidden space-y-4">
+                <div class="flex justify-between items-center bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
+                    <div>
+                        <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wide">Harvest Logs</h3>
+                        <p class="text-xs text-slate-400" id="totalHarvestCount">0 Records Logged</p>
+                    </div>
+                    <button onclick="openHarvestModal()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-sm transition flex items-center gap-1.5">
+                        <span>+</span> Record Harvest
+                    </button>
+                </div>
+
+                <div class="flex justify-between items-center bg-white p-2.5 rounded-xl border border-slate-100 shadow-sm gap-2">
+                    <div class="flex items-center gap-1.5">
+                        <span class="text-xs font-bold text-slate-500 uppercase">Filter:</span>
+                        <select id="harvestPondFilterSelect" onchange="changeHarvestPondFilter(this.value)" class="bg-blue-50 border border-blue-100 text-blue-700 font-bold text-xs rounded-lg px-2.5 py-1.5 outline-none cursor-pointer shadow-xs">
+                            <option value="ALL">All Ponds</option>
+                        </select>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <button onclick="document.getElementById('harvestRestoreInput').click()" class="text-xs font-semibold text-purple-700 bg-purple-50 px-2.5 py-1.5 rounded-lg border border-purple-200 hover:bg-purple-100 transition shadow-xs flex items-center gap-1" title="Restore Harvest Logs from CSV">
+                            <span>📤</span> Restore
+                        </button>
+                        <input type="file" id="harvestRestoreInput" accept=".csv" class="hidden" onchange="importHarvestCSV(event)">
+
+                        <button onclick="exportHarvestCSV()" class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200 hover:bg-emerald-100 transition shadow-xs flex items-center gap-1" title="Backup Harvest Logs to CSV">
+                            <span>📥</span> Backup
+                        </button>
+                    </div>
+                </div>
+
+                <div id="harvestCardsList" class="space-y-4"></div>
             </div>
 
         </div>
@@ -241,6 +298,85 @@
                 <button onclick="openModal()" class="w-1/2 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 text-sm shadow-sm transition">
                     <span>+</span> Record Feed
                 </button>
+            </div>
+        </div>
+
+        <!-- Record Harvest Event Modal (Matches User Screenshot) -->
+        <div id="harvestModal" class="fixed inset-0 bg-black/60 hidden flex items-end sm:items-center justify-center z-50">
+            <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl max-h-[90vh] overflow-y-auto p-5 shadow-2xl">
+                <div class="flex justify-between items-center border-b pb-3 mb-4">
+                    <div>
+                        <h2 id="harvestModalTitleText" class="text-base font-bold text-slate-800">Record Harvest Event</h2>
+                        <p class="text-xs text-slate-500">Log partial or final biomass extraction</p>
+                    </div>
+                    <button onclick="closeHarvestModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+                </div>
+
+                <form id="harvestForm" onsubmit="handleHarvestSubmit(event)" class="space-y-3.5 text-sm">
+                    <div class="grid grid-cols-3 gap-2">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Select Pond *</label>
+                            <select id="harvestPond" required onchange="onHarvestPondChange(this.value)" class="w-full border border-slate-200 p-2 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 bg-white font-bold text-xs"></select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Harvest Date *</label>
+                            <input type="date" id="harvestDate" required class="w-full border border-slate-200 p-2 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-xs">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Type *</label>
+                            <select id="harvestType" required class="w-full border border-slate-200 p-2 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 bg-white text-xs font-bold">
+                                <option value="Partial Harvest">Partial Harvest</option>
+                                <option value="Final Harvest">Final Harvest</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Biomass (kg) *</label>
+                            <input type="number" step="0.1" id="harvestBiomass" placeholder="500" required oninput="calcHarvestMetrics()" class="w-full border border-slate-200 p-2 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-xs font-bold">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Count (pcs/kg) *</label>
+                            <input type="number" step="0.1" id="harvestCount" placeholder="51" required oninput="calcHarvestMetrics()" class="w-full border border-slate-200 p-2 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-xs font-bold">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Price/kg (₹) *</label>
+                            <input type="number" step="0.1" id="harvestPrice" placeholder="450" required oninput="calcHarvestMetrics()" class="w-full border border-slate-200 p-2 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-xs font-bold">
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Total Feed Consumed (kg)</label>
+                        <input type="number" step="0.1" id="harvestFeedConsumed" placeholder="2308" class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-xs font-medium">
+                    </div>
+
+                    <!-- Computed Indicator Card (from user UI design) -->
+                    <div class="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3 flex justify-between items-center text-center">
+                        <div class="flex-1">
+                            <span class="text-[10px] uppercase font-bold text-emerald-800 tracking-wider block">Harvest ABW</span>
+                            <span id="displayHarvestABW" class="text-sm font-black text-emerald-900">—</span>
+                        </div>
+                        <div class="flex-1 border-x border-emerald-200 px-2">
+                            <span class="text-[10px] uppercase font-bold text-emerald-800 tracking-wider block">Total Shrimp Pieces</span>
+                            <span id="displayHarvestPieces" class="text-sm font-black text-emerald-900">—</span>
+                        </div>
+                        <div class="flex-1">
+                            <span class="text-[10px] uppercase font-bold text-emerald-800 tracking-wider block">Final Value</span>
+                            <span id="displayHarvestValue" class="text-sm font-black text-emerald-900">₹0</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Buyer / Notes (Optional)</label>
+                        <textarea id="harvestNotes" rows="2" placeholder="e.g. Sold to local agent, packing crates..." class="w-full border border-slate-200 p-2 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-xs"></textarea>
+                    </div>
+
+                    <div class="flex items-center gap-2 pt-1">
+                        <button type="submit" id="harvestSubmitBtn" class="bg-blue-600 hover:bg-blue-700 text-white py-2.5 px-6 rounded-xl font-bold shadow-md transition text-xs">Save Harvest Log</button>
+                        <button type="button" onclick="closeHarvestModal()" class="text-slate-600 hover:text-slate-800 px-4 py-2.5 text-xs font-semibold">Cancel</button>
+                    </div>
+                </form>
             </div>
         </div>
 
@@ -490,7 +626,6 @@
                         </div>
                     </div>
 
-                    <!-- Feed Codes & Quantities Box -->
                     <div id="feedProductsSection" class="space-y-3 border-t pt-3 relative z-20">
                         <div class="flex justify-between items-center">
                             <span class="text-xs font-bold text-slate-500 uppercase">Feed Codes & Quantities (Max 2 Mix)</span>
@@ -499,7 +634,6 @@
                         <div id="feedRowsContainer" class="space-y-2"></div>
                     </div>
 
-                    <!-- Searchable Supplement Section -->
                     <div id="supplementProductsSection" class="space-y-2 border-t pt-3 relative z-10">
                         <div class="flex justify-between items-center">
                             <span class="text-xs font-bold text-slate-500 uppercase">Supplement (1 Item Only)</span>
@@ -663,6 +797,7 @@
         let feedEntries = JSON.parse(localStorage.getItem('bc_feeds')) || [];
         let samplingEntries = JSON.parse(localStorage.getItem('bc_sampling')) || [];
         let treatmentEntries = JSON.parse(localStorage.getItem('bc_treatments')) || [];
+        let harvestEntries = JSON.parse(localStorage.getItem('bc_harvests')) || [];
 
         const treatmentCatalog = {
             'Probiotics': [
@@ -722,9 +857,11 @@
         let editingPondId = null;
         let editingSampleId = null;
         let editingTreatmentId = null;
+        let editingHarvestId = null;
         let editingEntryId = null;
         let samplingPondFilter = 'ALL';
         let treatmentPondFilter = 'ALL';
+        let harvestPondFilter = 'ALL';
 
         let selectedHour = 7;
         let selectedMinute = 0;
@@ -787,6 +924,12 @@
                 localStorage.setItem('bc_treatments', JSON.stringify(treatmentEntries));
                 renderTreatmentList();
             }, err => console.error("Treatments sync error:", err));
+
+            db.collection('harvests').onSnapshot(snap => {
+                harvestEntries = snap.docs.map(doc => doc.data());
+                localStorage.setItem('bc_harvests', JSON.stringify(harvestEntries));
+                renderHarvestList();
+            }, err => console.error("Harvest sync error:", err));
         }
 
         function refreshAllViews() {
@@ -796,6 +939,7 @@
             renderHistory();
             renderSamplingList();
             renderTreatmentList();
+            renderHarvestList();
         }
 
         function savePondToDb(pondObj) {
@@ -872,6 +1016,25 @@
                 treatmentEntries = treatmentEntries.filter(t => t.id !== treatId);
                 localStorage.setItem('bc_treatments', JSON.stringify(treatmentEntries));
                 renderTreatmentList();
+            }
+        }
+
+        function saveHarvestToDb(harvestObj) {
+            if (isFirebaseConnected && db) {
+                db.collection('harvests').doc(harvestObj.id.toString()).set(harvestObj);
+            } else {
+                localStorage.setItem('bc_harvests', JSON.stringify(harvestEntries));
+                renderHarvestList();
+            }
+        }
+
+        function deleteHarvestFromDb(harvestId) {
+            if (isFirebaseConnected && db) {
+                db.collection('harvests').doc(harvestId.toString()).delete();
+            } else {
+                harvestEntries = harvestEntries.filter(h => h.id !== harvestId);
+                localStorage.setItem('bc_harvests', JSON.stringify(harvestEntries));
+                renderHarvestList();
             }
         }
 
@@ -993,12 +1156,16 @@
             const samplingFilterSelect = document.getElementById('samplingPondFilterSelect');
             const treatmentPondSelect = document.getElementById('treatmentPond');
             const treatmentFilterSelect = document.getElementById('treatmentPondFilterSelect');
+            const harvestPondSelect = document.getElementById('harvestPond');
+            const harvestFilterSelect = document.getElementById('harvestPondFilterSelect');
             
             selector.innerHTML = '';
             if (samplingPondSelect) samplingPondSelect.innerHTML = '';
             if (treatmentPondSelect) treatmentPondSelect.innerHTML = '';
+            if (harvestPondSelect) harvestPondSelect.innerHTML = '';
             if (samplingFilterSelect) samplingFilterSelect.innerHTML = '<option value="ALL">All Ponds</option>';
             if (treatmentFilterSelect) treatmentFilterSelect.innerHTML = '<option value="ALL">All Ponds</option>';
+            if (harvestFilterSelect) harvestFilterSelect.innerHTML = '<option value="ALL">All Ponds</option>';
 
             if (ponds.length === 0) {
                 const opt = document.createElement('option');
@@ -1011,6 +1178,7 @@
             if (!ponds.some(p => p.id === currentPond)) currentPond = ponds[0].id;
             if (samplingPondFilter !== 'ALL' && !ponds.some(p => p.id === samplingPondFilter)) samplingPondFilter = 'ALL';
             if (treatmentPondFilter !== 'ALL' && !ponds.some(p => p.id === treatmentPondFilter)) treatmentPondFilter = 'ALL';
+            if (harvestPondFilter !== 'ALL' && !ponds.some(p => p.id === harvestPondFilter)) harvestPondFilter = 'ALL';
 
             ponds.forEach(p => {
                 const opt = document.createElement('option');
@@ -1033,6 +1201,13 @@
                     treatmentPondSelect.appendChild(tOpt);
                 }
 
+                if (harvestPondSelect) {
+                    const hOpt = document.createElement('option');
+                    hOpt.value = p.id;
+                    hOpt.innerText = p.id;
+                    harvestPondSelect.appendChild(hOpt);
+                }
+
                 if (samplingFilterSelect) {
                     const fOpt = document.createElement('option');
                     fOpt.value = p.id;
@@ -1048,11 +1223,19 @@
                     if (p.id === treatmentPondFilter) tfOpt.selected = true;
                     treatmentFilterSelect.appendChild(tfOpt);
                 }
+
+                if (harvestFilterSelect) {
+                    const hfOpt = document.createElement('option');
+                    hfOpt.value = p.id;
+                    hfOpt.innerText = p.id;
+                    if (p.id === harvestPondFilter) hfOpt.selected = true;
+                    harvestFilterSelect.appendChild(hfOpt);
+                }
             });
         }
 
         function switchTab(tab) {
-            const tabs = ['home', 'pond', 'feed', 'sampling', 'treatment'];
+            const tabs = ['home', 'pond', 'feed', 'sampling', 'treatment', 'harvest'];
             const bottomBar = document.getElementById('bottomActionBar');
             const headerPondSection = document.getElementById('headerPondSection');
             const headerHomeTitle = document.getElementById('headerHomeTitle');
@@ -1062,10 +1245,10 @@
                 const viewEl = document.getElementById(t + 'View');
                 
                 if (t === tab) {
-                    tabBtn.className = "py-3 px-2.5 text-blue-600 border-b-2 border-blue-600 font-semibold whitespace-nowrap";
+                    tabBtn.className = "py-3 px-2 text-blue-600 border-b-2 border-blue-600 font-semibold whitespace-nowrap";
                     viewEl.classList.remove('hidden');
                 } else {
-                    tabBtn.className = "py-3 px-2.5 hover:text-blue-600 font-medium whitespace-nowrap";
+                    tabBtn.className = "py-3 px-2 hover:text-blue-600 font-medium whitespace-nowrap";
                     viewEl.classList.add('hidden');
                 }
             });
@@ -1085,6 +1268,7 @@
                 if (tab === 'pond') renderPondList();
                 if (tab === 'sampling') renderSamplingList();
                 if (tab === 'treatment') renderTreatmentList();
+                if (tab === 'harvest') renderHarvestList();
             }
             updateHeaderDate();
         }
@@ -1104,6 +1288,11 @@
         function changeTreatmentPondFilter(v) {
             treatmentPondFilter = v;
             renderTreatmentList();
+        }
+
+        function changeHarvestPondFilter(v) {
+            harvestPondFilter = v;
+            renderHarvestList();
         }
 
         function toggleSortOrder() {
@@ -1459,6 +1648,222 @@
             });
         }
 
+        // --- 6. Harvest Rendering & Management ---
+        function renderHarvestList() {
+            const container = document.getElementById('harvestCardsList');
+            const totalCountEl = document.getElementById('totalHarvestCount');
+            container.innerHTML = '';
+
+            const filteredEntries = harvestPondFilter === 'ALL'
+                ? harvestEntries
+                : harvestEntries.filter(item => item.pond === harvestPondFilter);
+
+            if (totalCountEl) totalCountEl.innerText = `${filteredEntries.length} Records Logged`;
+
+            if (filteredEntries.length === 0) {
+                container.innerHTML = `<div class="bg-white p-6 rounded-2xl border border-slate-100 text-center text-slate-400 text-sm">No harvest events recorded.</div>`;
+                return;
+            }
+
+            const uniqueDates = [...new Set(filteredEntries.map(item => item.date))].sort((a, b) => new Date(b) - new Date(a));
+
+            uniqueDates.forEach((dateStr) => {
+                const entriesOnDate = filteredEntries.filter(item => item.date === dateStr);
+                const isLatestDate = (dateStr === uniqueDates[0]);
+
+                const dateSection = document.createElement('div');
+                dateSection.className = 'space-y-2.5';
+
+                dateSection.innerHTML = `
+                    <div class="flex justify-between items-center px-3 py-2 rounded-xl border ${isLatestDate ? 'bg-blue-600 text-white border-blue-600 shadow-sm' : 'bg-slate-200/80 text-slate-700 border-slate-300'}">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs">📅</span>
+                            <span class="text-xs font-black tracking-wide">${formatDateDisplay(dateStr)}</span>
+                            ${isLatestDate ? '<span class="text-[10px] bg-white text-blue-600 font-extrabold px-2 py-0.5 rounded-full shadow-xs">Latest</span>' : ''}
+                        </div>
+                        <span class="text-[11px] font-bold ${isLatestDate ? 'bg-blue-700/80 text-blue-100' : 'bg-white text-slate-600 border border-slate-300'} px-2.5 py-0.5 rounded-full">
+                            ${entriesOnDate.length} ${entriesOnDate.length === 1 ? 'Event' : 'Events'}
+                        </span>
+                    </div>
+                `;
+
+                const cardsContainer = document.createElement('div');
+                cardsContainer.className = 'space-y-2 pl-1';
+
+                entriesOnDate.forEach(item => {
+                    const pondObj = ponds.find(p => p.id === item.pond);
+                    const doc = pondObj ? calculateDOC(pondObj.stockingDate, item.date) : '-';
+                    const isFinal = item.type === 'Final Harvest';
+
+                    const card = document.createElement('div');
+                    card.className = `bg-white p-3.5 rounded-2xl border ${isLatestDate ? 'border-blue-200 ring-1 ring-blue-100' : 'border-slate-200'} shadow-xs space-y-2.5`;
+                    card.innerHTML = `
+                        <div class="flex justify-between items-center border-b border-slate-100 pb-2">
+                            <div class="flex items-center gap-2">
+                                <span class="bg-blue-600 text-white font-black px-2.5 py-1 rounded-lg text-xs">${item.pond}</span>
+                                <span class="text-[11px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded">DOC ${doc}</span>
+                                <span class="text-[11px] font-extrabold border px-2 py-0.5 rounded ${isFinal ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-amber-50 text-amber-700 border-amber-200'}">${item.type}</span>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button onclick="openHarvestModal(${item.id})" class="text-slate-500 hover:text-blue-600 transition">✏️</button>
+                                <button onclick="deleteHarvest(${item.id})" class="text-slate-400 hover:text-rose-600 transition text-sm">🗑️</button>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-4 gap-1.5 text-center">
+                            <div class="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                                <span class="text-[10px] text-slate-400 block font-medium">Biomass</span>
+                                <span class="font-bold text-slate-800 text-xs">${item.biomass} kg</span>
+                            </div>
+                            <div class="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                                <span class="text-[10px] text-slate-400 block font-medium">Count</span>
+                                <span class="font-bold text-slate-800 text-xs">${item.count} /kg</span>
+                            </div>
+                            <div class="bg-emerald-50/70 p-2 rounded-xl border border-emerald-100">
+                                <span class="text-[10px] text-emerald-600 font-semibold block">ABW</span>
+                                <span class="font-extrabold text-emerald-700 text-xs">${parseFloat(item.abw).toFixed(2)} g</span>
+                            </div>
+                            <div class="bg-blue-50/70 p-2 rounded-xl border border-blue-100">
+                                <span class="text-[10px] text-blue-600 font-semibold block">Rate</span>
+                                <span class="font-extrabold text-blue-700 text-xs">₹${item.price}</span>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-3 gap-1.5 text-xs text-center">
+                            <div class="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                                <span class="text-[10px] text-slate-400 block">Total Pieces</span>
+                                <span class="font-bold text-slate-700 text-xs">${(item.totalPieces || 0).toLocaleString()}</span>
+                            </div>
+                            <div class="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                                <span class="text-[10px] text-slate-400 block">Feed Consumed</span>
+                                <span class="font-bold text-slate-700 text-xs">${item.feedConsumed ? item.feedConsumed + ' kg' : '--'}</span>
+                            </div>
+                            <div class="bg-emerald-100/70 p-2 rounded-xl border border-emerald-200">
+                                <span class="text-[10px] text-emerald-800 font-bold block">Final Value</span>
+                                <span class="font-black text-emerald-900 text-xs">₹${(item.finalValue || 0).toLocaleString('en-IN')}</span>
+                            </div>
+                        </div>
+
+                        ${item.notes ? `<div class="text-xs text-slate-500 bg-slate-50/70 p-2 rounded-xl border border-slate-100 flex items-start gap-1.5"><span>💬</span><span class="italic">${item.notes}</span></div>` : ''}
+                    `;
+                    cardsContainer.appendChild(card);
+                });
+
+                dateSection.appendChild(cardsContainer);
+                container.appendChild(dateSection);
+            });
+        }
+
+        function calcHarvestMetrics() {
+            const biomass = parseFloat(document.getElementById('harvestBiomass').value) || 0;
+            const count = parseFloat(document.getElementById('harvestCount').value) || 0;
+            const price = parseFloat(document.getElementById('harvestPrice').value) || 0;
+
+            const abw = (count > 0) ? (1000 / count).toFixed(2) + ' gm' : '—';
+            const totalPieces = (biomass > 0 && count > 0) ? Math.round(biomass * count).toLocaleString() : '—';
+            const finalVal = (biomass > 0 && price > 0) ? '₹' + Math.round(biomass * price).toLocaleString('en-IN') : '₹0';
+
+            document.getElementById('displayHarvestABW').innerText = abw;
+            document.getElementById('displayHarvestPieces').innerText = totalPieces;
+            document.getElementById('displayHarvestValue').innerText = finalVal;
+        }
+
+        function onHarvestPondChange(pondId) {
+            if (editingHarvestId === null) {
+                const pondFeed = feedEntries
+                    .filter(e => e.pond === pondId)
+                    .reduce((acc, curr) => acc + (curr.fasting ? 0 : (parseFloat(curr.qty) || 0)), 0);
+                document.getElementById('harvestFeedConsumed').value = pondFeed > 0 ? pondFeed.toFixed(1) : '';
+            }
+        }
+
+        function openHarvestModal(id = null) {
+            syncPondDropdown();
+            document.getElementById('harvestModal').classList.remove('hidden');
+            const modalTitle = document.getElementById('harvestModalTitleText');
+            const submitBtn = document.getElementById('harvestSubmitBtn');
+
+            if (id !== null) {
+                editingHarvestId = id;
+                modalTitle.innerText = "Edit Harvest Log";
+                submitBtn.innerText = "Update Harvest Log";
+                const h = harvestEntries.find(x => x.id === id);
+                if (h) {
+                    document.getElementById('harvestPond').value = h.pond;
+                    document.getElementById('harvestDate').value = h.date;
+                    document.getElementById('harvestType').value = h.type || 'Partial Harvest';
+                    document.getElementById('harvestBiomass').value = h.biomass;
+                    document.getElementById('harvestCount').value = h.count;
+                    document.getElementById('harvestPrice').value = h.price;
+                    document.getElementById('harvestFeedConsumed').value = h.feedConsumed ?? '';
+                    document.getElementById('harvestNotes').value = h.notes || '';
+                    calcHarvestMetrics();
+                }
+            } else {
+                editingHarvestId = null;
+                modalTitle.innerText = "Record Harvest Event";
+                submitBtn.innerText = "Save Harvest Log";
+                document.getElementById('harvestForm').reset();
+                document.getElementById('harvestDate').value = getSystemLatestDate();
+                document.getElementById('harvestType').value = 'Partial Harvest';
+                
+                const selectedPond = currentPond || (ponds.length > 0 ? ponds[0].id : '');
+                if (ponds.length > 0) document.getElementById('harvestPond').value = selectedPond;
+                onHarvestPondChange(selectedPond);
+                calcHarvestMetrics();
+            }
+        }
+
+        function closeHarvestModal() {
+            document.getElementById('harvestModal').classList.add('hidden');
+        }
+
+        function handleHarvestSubmit(e) {
+            e.preventDefault();
+            const pond = document.getElementById('harvestPond').value;
+            const date = document.getElementById('harvestDate').value;
+            const type = document.getElementById('harvestType').value;
+            const biomass = parseFloat(document.getElementById('harvestBiomass').value) || 0;
+            const count = parseFloat(document.getElementById('harvestCount').value) || 0;
+            const price = parseFloat(document.getElementById('harvestPrice').value) || 0;
+            const feedConsumed = parseFloat(document.getElementById('harvestFeedConsumed').value) || 0;
+            const notes = document.getElementById('harvestNotes').value.trim();
+
+            if (biomass <= 0 || count <= 0) {
+                alert("Please enter valid biomass and count values.");
+                return;
+            }
+
+            const abw = parseFloat((1000 / count).toFixed(2));
+            const totalPieces = Math.round(biomass * count);
+            const finalValue = Math.round(biomass * price);
+            const id = editingHarvestId !== null ? editingHarvestId : Date.now();
+
+            const harvestObj = {
+                id,
+                pond,
+                date,
+                type,
+                biomass,
+                count,
+                price,
+                feedConsumed,
+                abw,
+                totalPieces,
+                finalValue,
+                notes
+            };
+
+            saveHarvestToDb(harvestObj);
+            closeHarvestModal();
+        }
+
+        function deleteHarvest(id) {
+            if (confirm("Delete this harvest record?")) {
+                deleteHarvestFromDb(id);
+            }
+        }
+
         function handleFormSubmit(e) {
             e.preventDefault();
             const date = document.getElementById('feedingDate').value;
@@ -1685,6 +2090,184 @@
             downloadCSVFile([headers.join(","), ...rows].join("\r\n"), `Treatment_Backup_${new Date().toISOString().split('T')[0]}.csv`);
         }
 
+        function exportHarvestCSV() {
+            const data = harvestPondFilter === 'ALL' ? harvestEntries : harvestEntries.filter(h => h.pond === harvestPondFilter);
+            if (!data.length) return alert("No harvest records to export.");
+            const headers = ["Harvest ID", "Date", "Pond No", "Harvest Type", "Biomass (kg)", "Count (pcs/kg)", "ABW (gm)", "Price per kg", "Total Pieces", "Feed Consumed (kg)", "Final Value (Rs)", "DOC", "Notes"];
+            const rows = data.map(h => {
+                const pondObj = ponds.find(p => p.id === h.pond);
+                return [
+                    escapeCSV(h.id),
+                    escapeCSV(h.date),
+                    escapeCSV(h.pond),
+                    escapeCSV(h.type),
+                    escapeCSV(h.biomass),
+                    escapeCSV(h.count),
+                    escapeCSV(h.abw),
+                    escapeCSV(h.price),
+                    escapeCSV(h.totalPieces),
+                    escapeCSV(h.feedConsumed),
+                    escapeCSV(h.finalValue),
+                    escapeCSV(pondObj ? calculateDOC(pondObj.stockingDate, h.date) : ""),
+                    escapeCSV(h.notes || "")
+                ].join(",");
+            });
+            downloadCSVFile([headers.join(","), ...rows].join("\r\n"), `Harvest_Backup_${new Date().toISOString().split('T')[0]}.csv`);
+        }
+
+        // --- CSV Parsing Engine ---
+        function parseCSV(str) {
+            const arr = [];
+            let quote = false, row = 0, col = 0, c = 0;
+            for (c = 0; c < str.length; c++) {
+                let cc = str[c], nc = str[c+1];
+                arr[row] = arr[row] || [];
+                arr[row][col] = arr[row][col] || '';
+                if (cc == '"' && quote && nc == '"') { arr[row][col] += cc; ++c; continue; }
+                if (cc == '"') { quote = !quote; continue; }
+                if (cc == ',' && !quote) { ++col; continue; }
+                if (cc == '\r' && nc == '\n' && !quote) { ++row; col = 0; ++c; continue; }
+                if (cc == '\n' && !quote) { ++row; col = 0; continue; }
+                if (cc == '\r' && !quote) { ++row; col = 0; continue; }
+                arr[row][col] += cc;
+            }
+            return arr;
+        }
+
+        function importFeedCSV(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                const rows = parseCSV(evt.target.result);
+                if (rows.length < 2) return alert("Empty or invalid CSV");
+                if (!confirm("Restore feed logs? Existing entries will be updated.")) return;
+                
+                const entriesMap = new Map();
+                for (let i = 1; i < rows.length; i++) {
+                    const r = rows[i];
+                    if (r.length < 6 || !r[0]) continue;
+                    const id = parseInt(r[0], 10);
+                    if (!entriesMap.has(id)) {
+                        entriesMap.set(id, {
+                            id: id, pond: r[1], date: r[2], time: r[3],
+                            fasting: r[4] === 'Yes', notes: r[10] || "",
+                            feeds: [], supplement: null, qty: 0,
+                            cumulative: parseFloat(r[9]) || 0
+                        });
+                    }
+                    const entry = entriesMap.get(id);
+                    if (!entry.fasting && r[5]) { 
+                        const feedQty = parseFloat(r[6]) || 0;
+                        entry.feeds.push({ code: r[5], qty: feedQty });
+                        entry.qty += feedQty;
+                    }
+                    if (!entry.fasting && r[7] && !entry.supplement) { 
+                         entry.supplement = { code: r[7], qty: parseFloat(r[8]) || 0, dose: 0 }; 
+                    }
+                }
+                entriesMap.forEach(entry => saveFeedToDb(entry));
+                alert(`Successfully restored ${entriesMap.size} feed entries.`);
+                e.target.value = ''; 
+            };
+            reader.readAsText(file);
+        }
+
+        function importSamplingCSV(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                const rows = parseCSV(evt.target.result);
+                if(rows.length < 2) return alert("Empty or invalid CSV");
+                if(!confirm("Restore sampling logs?")) return;
+                
+                let imported = 0;
+                for(let i = 1; i < rows.length; i++) {
+                    const r = rows[i];
+                    if(r.length < 6 || !r[0]) continue;
+                    saveSamplingToDb({
+                        id: parseInt(r[0], 10) || Date.now() + i,
+                        date: r[1], pond: r[2],
+                        sampleWeight: parseFloat(r[3]) || 0,
+                        count: parseInt(r[4], 10) || 0,
+                        abw: parseFloat(r[5]) || 0,
+                        prevCumulativeFeed: parseFloat(r[7]) || 0,
+                        currCumulativeFeed: parseFloat(r[8]) || 0,
+                        netFeed: parseFloat(r[9]) || 0,
+                        notes: r[11] || ""
+                    });
+                    imported++;
+                }
+                alert(`Successfully restored ${imported} sampling records.`);
+                e.target.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        function importTreatmentCSV(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                const rows = parseCSV(evt.target.result);
+                if(rows.length < 2) return alert("Empty or invalid CSV");
+                if(!confirm("Restore treatment logs?")) return;
+                
+                let imported = 0;
+                for(let i = 1; i < rows.length; i++) {
+                    const r = rows[i];
+                    if(r.length < 5 || !r[0]) continue;
+                    saveTreatmentToDb({
+                        id: parseInt(r[0], 10) || Date.now() + i,
+                        date: r[1], pond: r[2],
+                        category: r[3] || 'Probiotics', product: r[4],
+                        qty: parseFloat(r[5]) || 0, unit: r[6],
+                        purpose: r[7], notes: r[9] || ""
+                    });
+                    imported++;
+                }
+                alert(`Successfully restored ${imported} treatment records.`);
+                e.target.value = '';
+            };
+            reader.readAsText(file);
+        }
+
+        function importHarvestCSV(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                const rows = parseCSV(evt.target.result);
+                if (rows.length < 2) return alert("Empty or invalid CSV");
+                if (!confirm("Restore harvest records?")) return;
+
+                let imported = 0;
+                for (let i = 1; i < rows.length; i++) {
+                    const r = rows[i];
+                    if (r.length < 6 || !r[0]) continue;
+                    saveHarvestToDb({
+                        id: parseInt(r[0], 10) || Date.now() + i,
+                        date: r[1],
+                        pond: r[2],
+                        type: r[3] || 'Partial Harvest',
+                        biomass: parseFloat(r[4]) || 0,
+                        count: parseFloat(r[5]) || 0,
+                        abw: parseFloat(r[6]) || 0,
+                        price: parseFloat(r[7]) || 0,
+                        totalPieces: parseInt(r[8], 10) || 0,
+                        feedConsumed: parseFloat(r[9]) || 0,
+                        finalValue: parseFloat(r[10]) || 0,
+                        notes: r[12] || ""
+                    });
+                    imported++;
+                }
+                alert(`Successfully restored ${imported} harvest records.`);
+                e.target.value = '';
+            };
+            reader.readAsText(file);
+        }
+
         function selectTreatmentCategory(cat, preserveValue = false) {
             ['Probiotics', 'Medicine', 'Fertilizers'].forEach(c => {
                 const label = document.getElementById('catLabel' + c);
@@ -1730,7 +2313,7 @@
                         const badge = document.getElementById('treatmentUnitBadge');
                         if (badge) {
                             badge.innerText = unit;
-                            badge.className = `absolute right-2 px-2.5 py-1 rounded text-xs font-black pointer-events-none border ${unit === 'Ltr' ? 'bg-cyan-50 text-cyan-700 border-cyan-200' : 'bg-blue-50 text-blue-700 border-blue-200'}`;
+                            badge.className = `absolute right-2 px-2.5 py-1 rounded text-xs font-black pointer-events-none border ${unit === 'Ltr' ? 'bg-cyan-50 text-cyan-700 border-cyan-200' : 'bg-blue-50 text-blue-700 border border-blue-200'}`;
                         }
                         document.getElementById('treatmentQty').focus();
                     };
@@ -1814,7 +2397,6 @@
                 const selectedPond = currentPond || (ponds.length > 0 ? ponds[0].id : '');
                 if (ponds.length > 0) document.getElementById('samplingPond').value = selectedPond;
 
-                // Pick up previous sample's current cumulative feed, or 0 if first sample
                 const prevFeed = getLatestCumulativeForPond(selectedPond);
                 document.getElementById('prevCumulativeFeed').value = prevFeed;
                 document.getElementById('currCumulativeFeed').value = '';
