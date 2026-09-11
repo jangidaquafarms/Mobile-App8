@@ -4,9 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Shrimp Farm Management - Farm Hub</title>
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
     <script src="https://cdn.tailwindcss.com"></script>
 
     <!-- Firebase Compat Libraries for Direct Browser Sync & Auth -->
@@ -15,21 +12,6 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
 
     <style>
-        /* View-Only Mode: Hide Add, Edit, Delete, and Restore controls */
-        body.view-only-mode button[onclick*="openPondModal"],
-        body.view-only-mode button[onclick*="openWaterModal"],
-        body.view-only-mode button[onclick*="openModal"],
-        body.view-only-mode button[onclick*="openSamplingModal"],
-        body.view-only-mode button[onclick*="openTreatmentModal"],
-        body.view-only-mode button[onclick*="delete"],
-        body.view-only-mode button[onclick*="Restore"],
-        body.view-only-mode button[onclick*="restore"],
-        body.view-only-mode button[onclick*="import"],
-        body.view-only-mode label:has(input[accept*="csv"]),
-        body.view-only-mode #harvestForm,
-        body.view-only-mode #bottomActionBar {
-            display: none !important;
-        }
         @media screen and (max-width: 768px) {
             input, select, textarea {
                 font-size: 16px !important;
@@ -64,18 +46,18 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <meta name="apple-mobile-web-app-title" content="Farm Hub">
-    <link rel="apple-touch-icon" href="icon.png?v=1.0">
-    <link rel="icon" type="image/png" href="icon.png?v=1.0">
+    <link rel="apple-touch-icon" href="icon.png">
+    <link rel="icon" type="image/png" href="icon.png">
 </head>
-<body class="bg-slate-50 font-sans h-[100dvh] flex flex-col overflow-hidden pt-[env(safe-area-inset-top)]">
+<body class="bg-slate-50 font-sans h-screen flex flex-col overflow-hidden">
 
-    <!-- Startup Loading Screen (Prevents PIN flash if already logged in) -->
+    <!-- Startup Loading Screen -->
     <div id="authLoadingScreen" class="fixed inset-0 bg-slate-50 z-[10000] flex flex-col items-center justify-center">
         <div class="w-9 h-9 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-3"></div>
         <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Loading Farm Hub...</p>
     </div>
 
-    <!-- 1-Time Setup PIN Lock Screen (Shown only on first visit or if signed out) -->
+    <!-- 1-Time Setup PIN Lock Screen -->
     <div id="pinAuthScreen" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9999] hidden flex items-center justify-center p-4">
         <div class="bg-white w-full max-w-xs rounded-2xl p-6 shadow-2xl text-center border border-slate-100">
             <div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-3 text-2xl">
@@ -97,7 +79,7 @@
         </div>
     </div>
 
-    <!-- Main App Container (Unlocks permanently after 1st PIN entry) -->
+    <!-- Main App Container -->
     <div id="mainAppContainer" class="h-full flex flex-col overflow-hidden hidden">
         
         <!-- Fixed Header & Navigation Container -->
@@ -116,7 +98,6 @@
                         </div>
                     </div>
                     <div class="flex items-center space-x-3 text-lg">
-                        <!-- Real-Time Sync Indicator -->
                         <span id="syncStatusBadge" class="text-xs font-extrabold bg-blue-700 px-2 py-1 rounded-full border border-blue-400/40 text-blue-100 flex items-center gap-1" title="Real-time Cloud Sync Active">
                             <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Cloud Sync
                         </span>
@@ -126,16 +107,14 @@
                 </div>
             </div>
 
-            <!-- Navigation Tabs: Home, Pond, Feed, Sampling, Treatment -->
+            <!-- Navigation Tabs -->
             <div class="bg-white border-b border-slate-200">
                 <div class="max-w-md mx-auto flex justify-between text-sm font-medium text-slate-500 px-2 overflow-x-auto no-scrollbar">
                     <button onclick="switchTab('home')" id="tabHome" class="py-3 px-2.5 text-blue-600 border-b-2 border-blue-600 font-semibold whitespace-nowrap">Home</button>
                     <button onclick="switchTab('pond')" id="tabPond" class="py-3 px-2.5 hover:text-blue-600 font-medium whitespace-nowrap">Pond</button>
-                    <button onclick="switchTab('water')" id="tabWater" class="py-3 px-2.5 hover:text-blue-600 font-medium whitespace-nowrap">Water Quality</button>
                     <button onclick="switchTab('feed')" id="tabFeed" class="py-3 px-2.5 hover:text-blue-600 font-medium whitespace-nowrap">Feed</button>
                     <button onclick="switchTab('sampling')" id="tabSampling" class="py-3 px-2.5 hover:text-blue-600 font-medium whitespace-nowrap">Sampling</button>
                     <button onclick="switchTab('treatment')" id="tabTreatment" class="py-3 px-2.5 hover:text-blue-600 font-medium whitespace-nowrap">Treatment</button>
-                    <button onclick="switchTab('harvest')" id="tabHarvest" class="py-3 px-2.5 hover:text-blue-600 font-medium whitespace-nowrap">Harvest</button>
                 </div>
             </div>
         </div>
@@ -161,43 +140,6 @@
                 </div>
                 <div id="pondCardsList" class="space-y-3"></div>
             </div>
-            <!-- Water Quality View Container -->
-            <div id="waterView" class="hidden space-y-3">
-                <div class="flex justify-between items-center bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
-                    <div>
-                        <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wide">Water Quality</h3>
-                        <p class="text-xs text-slate-400">Daily Pond Parameters</p>
-                    </div>
-                    <button onclick="openWaterModal()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-3.5 py-2 rounded-xl shadow-sm transition">
-    + Log Reading
-</button>
-                </div>
-
-                <!-- Parameters Overview Grid -->
-                <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100">
-                    <div class="grid grid-cols-2 gap-3">
-                        <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                            <span class="text-[10px] font-bold uppercase text-slate-400">DO (Dissolved Oxygen)</span>
-                            <div class="text-lg font-black text-slate-700 mt-0.5">-- <span class="text-xs font-medium text-slate-400">ppm</span></div>
-                        </div>
-                        <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                            <span class="text-[10px] font-bold uppercase text-slate-400">pH Level</span>
-                            <div class="text-lg font-black text-slate-700 mt-0.5">--</div>
-                        </div>
-                        <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                            <span class="text-[10px] font-bold uppercase text-slate-400">Salinity</span>
-                            <div class="text-lg font-black text-slate-700 mt-0.5">-- <span class="text-xs font-medium text-slate-400">ppt</span></div>
-                        </div>
-                        <div class="bg-slate-50 p-3 rounded-xl border border-slate-100">
-                            <span class="text-[10px] font-bold uppercase text-slate-400">Ammonia (TAN)</span>
-                            <div class="text-lg font-black text-slate-700 mt-0.5">-- <span class="text-xs font-medium text-slate-400">ppm</span></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Water Quality Logged Records List -->
-                <div id="waterRecordsList" class="space-y-2"></div>
-            </div>
 
             <!-- 3. Feed View Container -->
             <div id="feedView" class="hidden space-y-3">
@@ -215,15 +157,11 @@
                     <span class="text-xs font-bold text-slate-500 uppercase">Feed Logs</span>
                     <div class="flex items-center gap-1.5">
                         <button onclick="exportFeedCSV()" class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200 hover:bg-emerald-100 transition shadow-xs flex items-center gap-1" title="Backup Feed Logs to CSV">
-                        <span>📥</span> Backup
-                    </button>
-                    <button onclick="document.getElementById('feedRestoreInput').click()" class="text-xs font-semibold text-blue-700 bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-200 hover:bg-blue-100 transition shadow-xs flex items-center gap-1" title="Restore Feed Logs from CSV">
-                        <span>📤</span> Restore
-                    </button>
-                    <input type="file" id="feedRestoreInput" accept=".csv" class="hidden" onchange="importFeedCSV(event)">
-                    <button onclick="toggleSortOrder()" id="sortBtnText" class="text-xs font-semibold text-blue-600 bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-100 hover:bg-blue-100 transition shadow-xs">
-                        Latest First ↓
-                    </button>
+                            <span>📥</span> Backup
+                        </button>
+                        <button onclick="toggleSortOrder()" id="sortBtnText" class="text-xs font-semibold text-blue-600 bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-100 hover:bg-blue-100 transition shadow-xs">
+                            Latest First ↓
+                        </button>
                     </div>
                 </div>
 
@@ -260,10 +198,6 @@
                     <button onclick="exportSamplingCSV()" class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200 hover:bg-emerald-100 transition shadow-xs flex items-center gap-1" title="Backup Sampling Logs to CSV">
                         <span>📥</span> Backup
                     </button>
-                    <button onclick="document.getElementById('samplingRestoreInput').click()" class="text-xs font-semibold text-blue-700 bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-200 hover:bg-blue-100 transition shadow-xs flex items-center gap-1" title="Restore Sampling Logs from CSV">
-    <span>📤</span> Restore
-</button>
-<input type="file" id="samplingRestoreInput" accept=".csv" class="hidden" onchange="importSamplingCSV(event)">
                 </div>
 
                 <div id="samplingCardsList" class="space-y-4"></div>
@@ -291,118 +225,10 @@
                     <button onclick="exportTreatmentCSV()" class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200 hover:bg-emerald-100 transition shadow-xs flex items-center gap-1" title="Backup Treatment Logs to CSV">
                         <span>📥</span> Backup
                     </button>
-                    <button type="button" onclick="document.getElementById('treatmentRestoreInput').click()" class="text-xs font-semibold text-blue-700 bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-200 hover:bg-blue-100 transition shadow-xs flex items-center gap-1 cursor-pointer" title="Restore Treatment Logs from CSV">
-    <span>📤</span> Restore
-</button>
-<input type="file" id="treatmentRestoreInput" accept=".csv" class="hidden" onchange="importTreatmentCSV(event)">
                 </div>
 
                 <div id="treatmentCardsList" class="space-y-4"></div>
             </div>
-            <!-- 6. Harvest View Container -->
-    <div id="harvestView" class="hidden space-y-4">
-      
-      <!-- Record Harvest Card -->
-      <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-100 space-y-4">
-        <h2 class="text-base font-bold text-slate-800">Record Harvest Event</h2>
-
-        <form id="harvestForm" onsubmit="saveHarvestEvent(event)" class="space-y-3">
-          
-          <!-- Row 1: Pond & Date -->
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">Select Pond *</label>
-              <select id="harvestPond" required class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:border-blue-600 outline-none">
-                <option value="">Select Pond</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">Harvest Date *</label>
-              <input type="date" id="harvestDate" required class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:border-blue-600 outline-none">
-            </div>
-          </div>
-
-          <!-- Row 2: Type & Feed Consumed -->
-          <div class="grid grid-cols-2 gap-3">
-            <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">Type *</label>
-              <select id="harvestType" required class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:border-blue-600 outline-none">
-                <option value="Partial Harvest">Partial Harvest</option>
-                <option value="Full Final Harvest">Full Final Harvest</option>
-              </select>
-            </div>
-            <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1">Total Feed (kg)</label>
-              <input type="number" step="any" id="harvestTotalFeed" placeholder="2308" class="w-full px-3 py-2 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:border-blue-600 outline-none">
-            </div>
-          </div>
-
-          <!-- Row 3: Biomass, Count & Price -->
-          <div class="grid grid-cols-3 gap-2">
-            <div>
-              <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">Biomass (kg) *</label>
-              <input type="number" step="any" id="harvestBiomass" placeholder="500" required oninput="calcHarvestMetrics()" class="w-full px-2.5 py-2 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:border-blue-600 outline-none">
-            </div>
-            <div>
-              <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">Count (pcs/kg) *</label>
-              <input type="number" step="any" id="harvestCount" placeholder="51" required oninput="calcHarvestMetrics()" class="w-full px-2.5 py-2 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:border-blue-600 outline-none">
-            </div>
-            <div>
-              <label class="block text-[10px] font-bold text-slate-700 uppercase mb-1">Price/kg (₹) *</label>
-              <input type="number" step="any" id="harvestPrice" placeholder="450" required oninput="calcHarvestMetrics()" class="w-full px-2.5 py-2 text-xs border border-slate-200 rounded-xl bg-slate-50 focus:bg-white focus:border-blue-600 outline-none">
-            </div>
-          </div>
-
-          <!-- Live Green Calculation Banner -->
-          <div class="bg-emerald-50/70 border border-emerald-100 rounded-xl p-3 grid grid-cols-3 gap-1 text-center mt-2">
-            <div>
-              <span class="text-[9px] font-bold text-emerald-800 uppercase block">HARVEST ABW</span>
-              <strong id="liveHarvestAbw" class="text-xs font-black text-slate-800">—</strong>
-            </div>
-            <div>
-              <span class="text-[9px] font-bold text-emerald-800 uppercase block">TOTAL PIECES</span>
-              <strong id="liveHarvestPieces" class="text-xs font-black text-slate-800">—</strong>
-            </div>
-            <div>
-              <span class="text-[9px] font-bold text-emerald-800 uppercase block">FINAL VALUE</span>
-              <strong id="liveHarvestValue" class="text-xs font-black text-slate-900">₹0</strong>
-            </div>
-          </div>
-
-          <!-- Action Buttons -->
-          <div class="flex items-center gap-2 pt-2">
-            <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2.5 rounded-xl shadow-xs transition">
-              Save Harvest Log
-            </button>
-            <button type="reset" onclick="resetHarvestForm()" class="bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold px-3 py-2.5 rounded-xl transition">
-              Cancel
-            </button>
-          </div>
-        </form>
-      </div>
-
-      <!-- Past Harvest Records -->
-      <div class="space-y-2">
-       <div class="flex justify-between items-center px-1">
-          <h3 class="text-xs font-bold text-slate-500 uppercase">Recent Harvest Logs</h3>
-          <div class="flex items-center gap-1.5">
-            <!-- Backup Button -->
-            <button type="button" onclick="backupHarvestData()" class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200 hover:bg-emerald-100 transition flex items-center gap-1">
-              <span>📥</span> Backup
-            </button>
-            <!-- Restore Button -->
-            <label class="text-xs font-semibold text-blue-700 bg-blue-50 px-2.5 py-1.5 rounded-lg border border-blue-200 hover:bg-blue-100 transition flex items-center gap-1 cursor-pointer mb-0">
-              <span>📤</span> Restore
-              <input type="file" id="harvestRestoreFile" accept=".csv" onchange="restoreHarvestData(event)" class="hidden">
-            </label>
-          </div>
-        </div>
-        <div id="harvestRecordsList" class="space-y-2">
-          <div class="text-center py-6 text-xs text-slate-400 font-medium">No harvest records saved yet.</div>
-        </div>
-      </div>
-
-    </div>
 
         </div>
 
@@ -517,7 +343,7 @@
                 <div class="flex justify-between items-center border-b pb-3 mb-4">
                     <div>
                         <h2 id="samplingModalTitleText" class="text-base font-bold text-slate-800">Record Sampling Data</h2>
-                        <p id="samplingModalSubtitleText" class="text-xs text-slate-500">Calculate Average Body Weight (ABW)</p>
+                        <p id="samplingModalSubtitleText" class="text-xs text-slate-500">Calculate ABW & Feed Progression</p>
                     </div>
                     <button onclick="closeSamplingModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
                 </div>
@@ -525,23 +351,35 @@
                 <form id="samplingForm" onsubmit="handleSamplingSubmit(event)" class="space-y-4 text-sm">
                     <div class="grid grid-cols-2 gap-3">
                         <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">Date of Sampling *</label>
-                            <input type="date" id="samplingDate" required class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-xs">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Select Pond *</label>
+                            <select id="samplingPond" required onchange="onSamplingPondChange(this.value)" class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 bg-white font-bold text-xs"></select>
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">Pond No. *</label>
-                            <select id="samplingPond" required class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 bg-white font-bold text-xs"></select>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Sampling Date *</label>
+                            <input type="date" id="samplingDate" required class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-xs">
                         </div>
                     </div>
 
                     <div class="grid grid-cols-2 gap-3">
                         <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">Sample Weight (gm) *</label>
-                            <input type="number" step="0.1" id="sampleWeight" placeholder="e.g. 500" required oninput="calcABW()" class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-xs">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Sample Weight (Grams) *</label>
+                            <input type="number" step="0.1" id="sampleWeight" placeholder="e.g. 1000" required oninput="calcABW()" class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-xs">
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">Count (Pieces) *</label>
-                            <input type="number" id="sampleCount" placeholder="e.g. 32" required oninput="calcABW()" class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-xs">
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Shrimp Count (Pcs) *</label>
+                            <input type="number" id="sampleCount" placeholder="e.g. 53" required oninput="calcABW()" class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-xs">
+                        </div>
+                    </div>
+
+                    <!-- Cumulative Feed Inputs -->
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Previous Cumulative Feed (kg)</label>
+                            <input type="number" step="0.1" id="prevCumulativeFeed" placeholder="0" oninput="calcNetFeed()" class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-xs font-medium">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Current Cumulative Feed (kg)</label>
+                            <input type="number" step="0.1" id="currCumulativeFeed" placeholder="e.g. 2308" oninput="calcNetFeed()" class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-xs font-medium">
                         </div>
                     </div>
 
@@ -550,6 +388,15 @@
                         <div class="relative">
                             <input type="text" id="sampleABW" readonly placeholder="Auto calculated (Weight ÷ Count)" class="w-full border border-slate-200 p-2.5 rounded-lg bg-emerald-50/70 text-emerald-700 font-extrabold outline-none text-sm">
                             <span class="absolute right-3 top-2.5 text-xs text-emerald-600 font-semibold">gm/shrimp</span>
+                        </div>
+                    </div>
+
+                    <!-- Net Feed Consumption (Directly below ABW) -->
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Net Feed Consumption (kg)</label>
+                        <div class="relative">
+                            <input type="text" id="sampleNetFeed" readonly placeholder="Auto calculated (Current − Previous)" class="w-full border border-slate-200 p-2.5 rounded-lg bg-blue-50/70 text-blue-700 font-extrabold outline-none text-sm">
+                            <span class="absolute right-3 top-2.5 text-xs text-blue-600 font-semibold">kg</span>
                         </div>
                     </div>
 
@@ -730,7 +577,6 @@
     </div>
 
     <script>
-        // Real-Time Firebase Configuration
         const firebaseConfig = {
             apiKey: "AIzaSyDLf5brXhAIpqBBsuDNgUSe6JAGtwt_jxY",
             authDomain: "bluecrest-807d9.firebaseapp.com",
@@ -740,13 +586,11 @@
             appId: "1:958454959822:web:b291de038e674b933f4a9f"
         };
 
-        const ADMIN_EMAIL = "jangidaquafarms@gmail.com";
-        const VIEWER_EMAIL = "rakeshjangidpau@gmail.com";
+        const FIXED_USER_EMAIL = "jangidaquafarms@gmail.com";
 
         let db = null;
         let isFirebaseConnected = false;
         let isSyncInitialized = false;
-        let isViewOnly = false;
 
         try {
             firebase.initializeApp(firebaseConfig);
@@ -760,14 +604,12 @@
             console.warn("Running in local browser fallback mode.", err);
         }
 
-        // Authentication & PIN Listeners
         const pinInput = document.getElementById('authPinInput');
         const authStatus = document.getElementById('authStatusText');
         const authLoading = document.getElementById('authLoadingScreen');
         const authScreen = document.getElementById('pinAuthScreen');
         const mainApp = document.getElementById('mainAppContainer');
 
-        // Auto-unlock when 6th digit is typed
         pinInput.addEventListener('input', async () => {
             const pin = pinInput.value.trim();
             if (pin.length === 6) {
@@ -775,47 +617,23 @@
                 authStatus.className = "text-xs font-semibold mt-3 min-h-[18px] text-blue-600";
 
                 try {
-                    // 1. Check Admin PIN first
-                    await firebase.auth().signInWithEmailAndPassword(ADMIN_EMAIL, pin);
+                    await firebase.auth().signInWithEmailAndPassword(FIXED_USER_EMAIL, pin);
                     authStatus.textContent = "";
                     pinInput.value = "";
-                } catch (adminErr) {
-                    try {
-                        // 2. If Admin PIN fails, check Viewer PIN
-                        await firebase.auth().signInWithEmailAndPassword(VIEWER_EMAIL, pin);
-                        authStatus.textContent = "";
-                        pinInput.value = "";
-                    } catch (viewerErr) {
-                        authStatus.textContent = "Incorrect PIN. Try again.";
-                        authStatus.className = "text-xs font-semibold mt-3 min-h-[18px] text-rose-600";
-                        pinInput.value = "";
-                    }
+                } catch (err) {
+                    authStatus.textContent = "Incorrect PIN. Try again.";
+                    authStatus.className = "text-xs font-semibold mt-3 min-h-[18px] text-rose-600";
+                    pinInput.value = "";
                 }
             }
         });
 
-        // Instant session detection
         firebase.auth().onAuthStateChanged((user) => {
             authLoading.classList.add('hidden');
 
             if (user) {
                 authScreen.classList.add('hidden');
                 mainApp.classList.remove('hidden');
-
-                if (user.email === VIEWER_EMAIL) {
-                    isViewOnly = true;
-                    document.body.classList.add('view-only-mode');
-                    
-                    const statusBadge = document.getElementById('syncStatusBadge');
-                    if (statusBadge) {
-                        statusBadge.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400"></span> View Only`;
-                        statusBadge.className = "text-xs font-extrabold bg-amber-600/90 px-2 py-1 rounded-full border border-amber-400/40 text-white flex items-center gap-1";
-                    }
-                } else {
-                    isViewOnly = false;
-                    document.body.classList.remove('view-only-mode');
-                }
-
                 if (!isSyncInitialized) {
                     isSyncInitialized = true;
                     initRealtimeSync();
@@ -834,7 +652,6 @@
             }
         }
 
-        // App Data Storage
         let ponds = JSON.parse(localStorage.getItem('bc_ponds')) || [
             { id: 'P1', length: 100, breadth: 50, area: 5000, stockingDate: '2026-07-28', stockingCount: 150000 },
             { id: 'P2', length: 100, breadth: 60, area: 6000, stockingDate: '2026-07-28', stockingCount: 180000 },
@@ -923,7 +740,6 @@
             return 'Kg';
         }
 
-        // Real-Time Listeners
         function initRealtimeSync() {
             const statusEl = document.getElementById('syncStatusBadge');
 
@@ -937,16 +753,9 @@
             }
 
             if (statusEl) {
-            if (isViewOnly) {
-                statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400"></span> View Only`;
-                statusEl.className = "text-xs font-extrabold bg-amber-600/90 px-2 py-1 rounded-full border border-amber-400/40 text-white flex items-center gap-1";
-            } else {
                 statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Cloud Sync`;
-                statusEl.className = "text-xs font-extrabold bg-emerald-600/90 px-2 py-1 rounded-full border border-emerald-400/40 text-white flex items-center gap-1";
             }
-        }
 
-            // Sync Ponds
             db.collection('ponds').onSnapshot(snap => {
                 if (!snap.empty) {
                     ponds = snap.docs.map(doc => doc.data());
@@ -959,7 +768,6 @@
                 renderAllPondsSummary();
             }, err => console.error("Ponds sync error:", err));
 
-            // Sync Feeds
             db.collection('feeds').onSnapshot(snap => {
                 feedEntries = snap.docs.map(doc => doc.data());
                 localStorage.setItem('bc_feeds', JSON.stringify(feedEntries));
@@ -968,14 +776,12 @@
                 renderHistory();
             }, err => console.error("Feeds sync error:", err));
 
-            // Sync Sampling
             db.collection('sampling').onSnapshot(snap => {
                 samplingEntries = snap.docs.map(doc => doc.data());
                 localStorage.setItem('bc_sampling', JSON.stringify(samplingEntries));
                 renderSamplingList();
             }, err => console.error("Sampling sync error:", err));
 
-            // Sync Treatments
             db.collection('treatments').onSnapshot(snap => {
                 treatmentEntries = snap.docs.map(doc => doc.data());
                 localStorage.setItem('bc_treatments', JSON.stringify(treatmentEntries));
@@ -1123,6 +929,35 @@
             };
         }
 
+        function getLatestCumulativeForPond(pondId, excludeSampleId = null) {
+            const pondSamples = samplingEntries
+                .filter(s => s.pond === pondId && (excludeSampleId === null || s.id !== excludeSampleId))
+                .sort((a, b) => new Date(b.date + 'T00:00:00') - new Date(a.date + 'T00:00:00') || b.id - a.id);
+
+            if (pondSamples.length === 0) return 0;
+            return parseFloat(pondSamples[0].currCumulativeFeed) || 0;
+        }
+
+        function onSamplingPondChange(pondId) {
+            if (editingSampleId === null) {
+                const prevFeed = getLatestCumulativeForPond(pondId);
+                document.getElementById('prevCumulativeFeed').value = prevFeed;
+                calcNetFeed();
+            }
+        }
+
+        function calcNetFeed() {
+            const prev = parseFloat(document.getElementById('prevCumulativeFeed').value) || 0;
+            const curr = parseFloat(document.getElementById('currCumulativeFeed').value);
+            
+            if (isNaN(curr)) {
+                document.getElementById('sampleNetFeed').value = '';
+                return;
+            }
+            const net = curr - prev;
+            document.getElementById('sampleNetFeed').value = net.toFixed(1);
+        }
+
         function calculateDOC(stockingDateStr, latestDateStr) {
             if (!stockingDateStr || !latestDateStr) return 0;
             const stock = new Date(stockingDateStr + 'T00:00:00');
@@ -1217,7 +1052,7 @@
         }
 
         function switchTab(tab) {
-           const tabs = ['home', 'pond', 'water', 'feed', 'sampling', 'treatment', 'harvest'];
+            const tabs = ['home', 'pond', 'feed', 'sampling', 'treatment'];
             const bottomBar = document.getElementById('bottomActionBar');
             const headerPondSection = document.getElementById('headerPondSection');
             const headerHomeTitle = document.getElementById('headerHomeTitle');
@@ -1248,13 +1083,8 @@
                 headerHomeTitle.classList.remove('hidden');
                 if (tab === 'home') renderAllPondsSummary();
                 if (tab === 'pond') renderPondList();
-                if (tab === 'water') renderWaterList();
                 if (tab === 'sampling') renderSamplingList();
                 if (tab === 'treatment') renderTreatmentList();
-                if (tab === 'harvest') {
-            populateHarvestPonds();
-            renderHarvestList();
-        }
             }
             updateHeaderDate();
         }
@@ -1498,6 +1328,10 @@
                         growthHtml = `<div class="${isGain ? 'bg-blue-50/70 border-blue-100 text-blue-700' : 'bg-rose-50 border-rose-100 text-rose-700'} p-2 rounded-xl border"><span class="text-[10px] block font-semibold">Growth</span><span class="font-extrabold text-xs">${growthInfo.text}</span></div>`;
                     }
 
+                    const netFeedVal = item.netFeed !== undefined 
+                        ? item.netFeed 
+                        : ((parseFloat(item.currCumulativeFeed) || 0) - (parseFloat(item.prevCumulativeFeed) || 0)).toFixed(1);
+
                     const card = document.createElement('div');
                     card.className = `bg-white p-3.5 rounded-2xl border ${isLatestDate ? 'border-blue-200 ring-1 ring-blue-100' : 'border-slate-200'} shadow-xs space-y-2.5`;
                     card.innerHTML = `
@@ -1516,6 +1350,20 @@
                             <div class="bg-slate-50 p-2 rounded-xl border border-slate-100"><span class="text-[10px] text-slate-400 block font-medium">Count</span><span class="font-bold text-slate-700 text-xs">${item.count} pcs</span></div>
                             <div class="bg-emerald-50/70 p-2 rounded-xl border border-emerald-100"><span class="text-[10px] text-emerald-600 font-semibold block">ABW</span><span class="font-extrabold text-emerald-700 text-xs">${parseFloat(item.abw).toFixed(2)} gm</span></div>
                             ${growthHtml}
+                        </div>
+                        <div class="grid grid-cols-3 gap-1.5 text-xs text-center">
+                            <div class="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                                <span class="text-[10px] text-slate-400 block">Prev Feed</span>
+                                <span class="font-bold text-slate-700 text-xs">${item.prevCumulativeFeed ?? 0} kg</span>
+                            </div>
+                            <div class="bg-slate-50 p-2 rounded-xl border border-slate-100">
+                                <span class="text-[10px] text-slate-400 block">Curr Feed</span>
+                                <span class="font-bold text-slate-700 text-xs">${item.currCumulativeFeed ? item.currCumulativeFeed + ' kg' : '--'}</span>
+                            </div>
+                            <div class="bg-blue-50/70 p-2 rounded-xl border border-blue-100">
+                                <span class="text-[10px] text-blue-600 font-bold block">Net Feed</span>
+                                <span class="font-black text-blue-700 text-xs">${netFeedVal} kg</span>
+                            </div>
                         </div>
                         ${item.notes ? `<div class="text-xs text-slate-500 bg-slate-50/70 p-2 rounded-xl border border-slate-100 flex items-start gap-1.5"><span>💬</span><span class="italic">${item.notes}</span></div>` : ''}
                     `;
@@ -1674,6 +1522,9 @@
             const pond = document.getElementById('samplingPond').value;
             const sampleWeight = parseFloat(document.getElementById('sampleWeight').value) || 0;
             const count = parseInt(document.getElementById('sampleCount').value, 10) || 0;
+            const prevCumulativeFeed = parseFloat(document.getElementById('prevCumulativeFeed').value) || 0;
+            const currCumulativeFeed = parseFloat(document.getElementById('currCumulativeFeed').value) || 0;
+            const netFeed = parseFloat((currCumulativeFeed - prevCumulativeFeed).toFixed(1));
             const notes = document.getElementById('samplingNotes').value.trim();
 
             if (count <= 0) {
@@ -1683,7 +1534,18 @@
 
             const abw = parseFloat((sampleWeight / count).toFixed(2));
             const id = editingSampleId !== null ? editingSampleId : Date.now();
-            const sampleObj = { id, date, pond, sampleWeight, count, abw, notes };
+            const sampleObj = { 
+                id, 
+                date, 
+                pond, 
+                sampleWeight, 
+                count, 
+                abw, 
+                prevCumulativeFeed, 
+                currCumulativeFeed, 
+                netFeed,
+                notes 
+            };
 
             saveSamplingToDb(sampleObj);
             closeSamplingModal();
@@ -1790,125 +1652,28 @@
         function exportSamplingCSV() {
             const data = samplingPondFilter === 'ALL' ? samplingEntries : samplingEntries.filter(s => s.pond === samplingPondFilter);
             if (!data.length) return alert("No sampling records to export.");
-            const headers = ["Sample ID", "Date", "Pond No", "Sample Weight (gm)", "Count (pcs)", "ABW (gm)", "Growth (gm)", "DOC", "Notes"];
+            const headers = ["Sample ID", "Date", "Pond No", "Sample Weight (gm)", "Count (pcs)", "ABW (gm)", "Growth (gm)", "Prev Cumulative Feed (kg)", "Curr Cumulative Feed (kg)", "Net Feed Consumption (kg)", "DOC", "Notes"];
             const rows = data.map(s => {
                 const pondObj = ponds.find(p => p.id === s.pond);
-                return [escapeCSV(s.id), escapeCSV(s.date), escapeCSV(s.pond), escapeCSV(s.sampleWeight), escapeCSV(s.count), escapeCSV(s.abw?.toFixed(2)), escapeCSV(getGrowthFromLastSample(s).text), escapeCSV(pondObj ? calculateDOC(pondObj.stockingDate, s.date) : ""), escapeCSV(s.notes || "")].join(",");
+                const net = s.netFeed !== undefined ? s.netFeed : ((parseFloat(s.currCumulativeFeed) || 0) - (parseFloat(s.prevCumulativeFeed) || 0)).toFixed(1);
+                return [
+                    escapeCSV(s.id),
+                    escapeCSV(s.date),
+                    escapeCSV(s.pond),
+                    escapeCSV(s.sampleWeight),
+                    escapeCSV(s.count),
+                    escapeCSV(s.abw?.toFixed(2)),
+                    escapeCSV(getGrowthFromLastSample(s).text),
+                    escapeCSV(s.prevCumulativeFeed ?? 0),
+                    escapeCSV(s.currCumulativeFeed ?? ""),
+                    escapeCSV(net),
+                    escapeCSV(pondObj ? calculateDOC(pondObj.stockingDate, s.date) : ""),
+                    escapeCSV(s.notes || "")
+                ].join(",");
             });
             downloadCSVFile([headers.join(","), ...rows].join("\r\n"), `Sampling_Backup_${new Date().toISOString().split('T')[0]}.csv`);
         }
-function parseCSVLine(text) {
-            const result = [];
-            let cur = '';
-            let inQuotes = false;
-            for (let i = 0; i < text.length; i++) {
-                const c = text[i];
-                if (c === '"') {
-                    if (inQuotes && text[i + 1] === '"') {
-                        cur += '"';
-                        i++;
-                    } else {
-                        inQuotes = !inQuotes;
-                    }
-                } else if (c === ',' && !inQuotes) {
-                    result.push(cur.trim());
-                    cur = '';
-                } else {
-                    cur += c;
-                }
-            }
-            result.push(cur.trim());
-            return result;
-        }
 
-        function importFeedCSV(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const lines = e.target.result.split(/\r?\n/).filter(line => line.trim() !== '');
-                if (lines.length <= 1) {
-                    alert('File is empty or invalid.');
-                    return;
-                }
-
-                const grouped = {};
-                for (let i = 1; i < lines.length; i++) {
-                    const cols = parseCSVLine(lines[i]);
-                    if (cols.length < 5) continue;
-
-                    const id = parseInt(cols[0], 10) || Date.now() + i;
-                    const pond = cols[1];
-                    const date = cols[2];
-                    const time = cols[3];
-                    const isFasting = cols[4].toLowerCase() === 'yes';
-                    const feedCode = cols[5] || '';
-                    const feedQty = parseFloat(cols[6]) || 0;
-                    const suppCode = cols[7] || '';
-                    const suppQty = parseFloat(cols[8]) || 0;
-                    const notes = cols[10] || '';
-
-                    if (!grouped[id]) {
-                        grouped[id] = {
-                            id,
-                            pond,
-                            date,
-                            time,
-                            fasting: isFasting,
-                            feeds: [],
-                            supplement: suppCode ? { code: suppCode, qty: suppQty, dose: 0 } : null,
-                            qty: 0,
-                            notes,
-                            cumulative: 0
-                        };
-                    }
-
-                    if (!isFasting && feedCode && feedQty > 0) {
-                        grouped[id].feeds.push({ code: feedCode, qty: feedQty });
-                        grouped[id].qty += feedQty;
-                    }
-                }
-
-                Object.values(grouped).forEach(entry => saveFeedToDb(entry));
-                event.target.value = '';
-                alert('Feed records restored successfully!');
-            };
-            reader.readAsText(file);
-        }
-
-        function importSamplingCSV(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const lines = e.target.result.split(/\r?\n/).filter(line => line.trim() !== '');
-                if (lines.length <= 1) {
-                    alert('File is empty or invalid.');
-                    return;
-                }
-
-                for (let i = 1; i < lines.length; i++) {
-                    const cols = parseCSVLine(lines[i]);
-                    if (cols.length < 6) continue;
-
-                    const id = parseInt(cols[0], 10) || Date.now() + i;
-                    const date = cols[1];
-                    const pond = cols[2];
-                    const sampleWeight = parseFloat(cols[3]) || 0;
-                    const count = parseInt(cols[4], 10) || 0;
-                    const abw = parseFloat(cols[5]) || (count > 0 ? sampleWeight / count : 0);
-                    const notes = cols[8] || '';
-
-                    saveSamplingToDb({ id, date, pond, sampleWeight, count, abw, notes });
-                }
-
-                event.target.value = '';
-                alert('Sampling records restored successfully!');
-            };
-            reader.readAsText(file);
-        }
         function exportTreatmentCSV() {
             const data = treatmentPondFilter === 'ALL' ? treatmentEntries : treatmentEntries.filter(t => t.pond === treatmentPondFilter);
             if (!data.length) return alert("No treatment records to export.");
@@ -1919,46 +1684,7 @@ function parseCSVLine(text) {
             });
             downloadCSVFile([headers.join(","), ...rows].join("\r\n"), `Treatment_Backup_${new Date().toISOString().split('T')[0]}.csv`);
         }
-function importTreatmentCSV(event) {
-    const file = event.target.files[0];
-    if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = function(e) {
-        const lines = e.target.result.split(/\r?\n/).filter(line => line.trim() !== '');
-        if (lines.length <= 1) {
-            alert('File is empty or invalid.');
-            return;
-        }
-
-        const confirmRestore = confirm(`Found ${lines.length - 1} treatment record(s). Restore to database?`);
-        if (!confirmRestore) {
-            event.target.value = '';
-            return;
-        }
-
-        for (let i = 1; i < lines.length; i++) {
-            const cols = parseCSVLine(lines[i]);
-            if (cols.length < 6) continue;
-
-            const id = parseInt(cols[0], 10) || Date.now() + i;
-            const date = cols[1];
-            const pond = cols[2];
-            const category = cols[3] || 'Probiotics';
-            const product = cols[4] || '';
-            const qty = parseFloat(cols[5]) || 0;
-            const unit = cols[6] || determineUnit(product);
-            const purpose = cols[7] || 'Other';
-            const notes = cols[9] || '';
-
-            saveTreatmentToDb({ id, date, pond, category, product, qty, unit, purpose, notes });
-        }
-
-        event.target.value = '';
-        alert('Treatment records restored successfully!');
-    };
-    reader.readAsText(file);
-}
         function selectTreatmentCategory(cat, preserveValue = false) {
             ['Probiotics', 'Medicine', 'Fertilizers'].forEach(c => {
                 const label = document.getElementById('catLabel' + c);
@@ -2070,8 +1796,11 @@ function importTreatmentCSV(event) {
                     document.getElementById('samplingPond').value = sample.pond;
                     document.getElementById('sampleWeight').value = sample.sampleWeight;
                     document.getElementById('sampleCount').value = sample.count;
+                    document.getElementById('prevCumulativeFeed').value = sample.prevCumulativeFeed ?? 0;
+                    document.getElementById('currCumulativeFeed').value = sample.currCumulativeFeed ?? '';
                     document.getElementById('samplingNotes').value = sample.notes || '';
                     calcABW();
+                    calcNetFeed();
                 }
             } else {
                 editingSampleId = null;
@@ -2080,7 +1809,15 @@ function importTreatmentCSV(event) {
                 document.getElementById('samplingForm').reset();
                 document.getElementById('samplingDate').value = getSystemLatestDate();
                 document.getElementById('sampleABW').value = '';
-                if (ponds.length > 0) document.getElementById('samplingPond').value = currentPond || ponds[0].id;
+                document.getElementById('sampleNetFeed').value = '';
+
+                const selectedPond = currentPond || (ponds.length > 0 ? ponds[0].id : '');
+                if (ponds.length > 0) document.getElementById('samplingPond').value = selectedPond;
+
+                // Pick up previous sample's current cumulative feed, or 0 if first sample
+                const prevFeed = getLatestCumulativeForPond(selectedPond);
+                document.getElementById('prevCumulativeFeed').value = prevFeed;
+                document.getElementById('currCumulativeFeed').value = '';
             }
         }
 
@@ -2346,7 +2083,6 @@ function importTreatmentCSV(event) {
             const x = 128 + 72 * Math.sin(angle);
             const y = 128 - 72 * Math.cos(angle);
             document.getElementById('clockHandLine').setAttribute('x2', x);
-            document.getElementById('clockHandLine').setAttribute('y2', y);
             document.getElementById('clockHandDot').setAttribute('cx', x);
             document.getElementById('clockHandDot').setAttribute('cy', y);
         }
@@ -2398,490 +2134,6 @@ function importTreatmentCSV(event) {
                 document.getElementById('treatmentOptionsList')?.classList.add('hidden');
             }
         });
-function openWaterModal() {
-            const pondSelect = document.getElementById('waterPondInput');
-            if (pondSelect) {
-                pondSelect.innerHTML = '<option value="">Select Active Pond</option>';
-
-                if (typeof ponds !== 'undefined' && ponds.length > 0) {
-                    ponds.forEach(p => {
-                        const opt = document.createElement('option');
-                        opt.value = p.id;
-                        opt.textContent = p.id;
-                        if (p.id === currentPond) opt.selected = true;
-                        pondSelect.appendChild(opt);
-                    });
-                }
-            }
-
-            document.getElementById('waterModal').classList.remove('hidden');
-        }
-
-        function closeWaterModal() {
-            document.getElementById('waterModal').classList.add('hidden');
-        }
-// 1. Cloud Save
-async function saveWaterRecord(e) {
-    e.preventDefault();
-    const record = {
-        pond: document.getElementById('waterPondInput').value,
-        doVal: document.getElementById('waterDOInput').value || '--',
-        ph: document.getElementById('waterPHInput').value || '--',
-        salinity: document.getElementById('waterSalinityInput').value || '--',
-        ammonia: document.getElementById('waterAmmoniaInput').value || '--',
-        temp: document.getElementById('waterTempInput').value || '--',
-        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-        timestamp: new Date().toLocaleDateString('en-GB') + ' ' + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    };
-
-    try {
-        await db.collection('waterRecords').add(record);
-        closeWaterModal();
-        e.target.reset();
-    } catch (err) {
-        console.error("Error saving water reading to Firestore:", err);
-        alert("Failed to save to cloud: " + err.message);
-    }
-}
-
-// 2. Real-Time Listener
-function listenToWaterRecords() {
-    db.collection('waterRecords')
-      .orderBy('createdAt', 'desc')
-      .onSnapshot((snapshot) => {
-          const records = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          renderWaterList(records);
-      }, (error) => {
-          console.error("Firestore water listener error:", error);
-      });
-}
-
-// 3. Render List with Red pH Alert (< 7.5 or > 8.5)
-function renderWaterList(records = []) {
-    const listEl = document.getElementById('waterRecordsList');
-    if (!listEl) return;
-
-    if (records.length === 0) {
-        listEl.innerHTML = '<div class="text-center py-6 text-xs text-slate-400 font-medium">No water quality records logged yet.</div>';
-        return;
-    }
-
-    const latest = records[0];
-    const topPhBox = document.querySelector('#waterView .grid-cols-2 > div:nth-child(2)');
-    if (topPhBox && latest) {
-        const latestPh = parseFloat(latest.ph);
-        const isAlert = !isNaN(latestPh) && (latestPh < 7.5 || latestPh > 8.5);
-        topPhBox.innerHTML = `
-            <span class="text-[10px] font-bold uppercase ${isAlert ? 'text-rose-500' : 'text-slate-400'}">pH Level</span>
-            <div class="text-lg font-black mt-0.5" style="color: ${isAlert ? '#dc2626' : '#334155'} !important;">
-                ${latest.ph} ${isAlert ? '<span class="text-[10px] font-bold uppercase text-rose-500 bg-rose-100 px-1.5 py-0.5 rounded ml-1">Alert</span>' : ''}
-            </div>
-        `;
-        topPhBox.style.backgroundColor = isAlert ? '#fef2f2' : '#f8fafc';
-        topPhBox.style.borderColor = isAlert ? '#fecaca' : '#f1f5f9';
-    }
-
-    listEl.innerHTML = records.map(r => {
-        const phNum = parseFloat(r.ph);
-        const isPhAlert = !isNaN(phNum) && (phNum < 7.5 || phNum > 8.5);
-
-        const alertBoxStyle = isPhAlert 
-            ? 'background-color: #fef2f2 !important; border: 1px solid #fecaca !important;' 
-            : 'background-color: #f8fafc; border: 1px solid #f1f5f9;';
-
-        const alertTextStyle = isPhAlert 
-            ? 'color: #dc2626 !important; font-weight: 900 !important;' 
-            : 'color: #334155; font-weight: 900;';
-
-        const alertLabelStyle = isPhAlert 
-            ? 'color: #e11d48 !important; font-weight: 800;' 
-            : 'color: #94a3b8; font-weight: 700;';
-
-        return `
-            <div class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm space-y-2">
-                <div class="flex justify-between items-center">
-                    <span class="text-xs font-black text-blue-600 bg-blue-50 px-2.5 py-1 rounded-lg">Pond ${r.pond}</span>
-                    <span class="text-[10px] text-slate-400 font-semibold">${r.timestamp || ''}</span>
-                </div>
-                <div class="grid grid-cols-4 gap-2 pt-1 text-center">
-                    <div class="bg-slate-50 p-2 rounded-xl border border-slate-100">
-                        <span class="text-[9px] text-slate-400 font-bold block">DO</span>
-                        <span class="text-xs font-black text-slate-700">${r.doVal}</span>
-                    </div>
-                    <div class="p-2 rounded-xl transition" style="${alertBoxStyle}">
-                        <span class="text-[9px] block" style="${alertLabelStyle}">pH</span>
-                        <span class="text-xs" style="${alertTextStyle}">${r.ph}</span>
-                    </div>
-                    <div class="bg-slate-50 p-2 rounded-xl border border-slate-100">
-                        <span class="text-[9px] text-slate-400 font-bold block">SALINITY</span>
-                        <span class="text-xs font-black text-slate-700">${r.salinity}</span>
-                    </div>
-                    <div class="bg-slate-50 p-2 rounded-xl border border-slate-100">
-                        <span class="text-[9px] text-slate-400 font-bold block">NH3/TAN</span>
-                        <span class="text-xs font-black text-slate-700">${r.ammonia}</span>
-                    </div>
-                </div>
-            </div>
-        `;
-    }).join('');
-}
-// ==========================================
-// HARVEST CSV BACKUP & RESTORE
-// ==========================================
-
-// 1. Export all harvest records to a .csv spreadsheet
-async function backupHarvestData() {
-    try {
-        const snapshot = await db.collection('harvestRecords').orderBy('date', 'desc').get();
-        if (snapshot.empty) {
-            alert("No harvest records found to back up.");
-            return;
-        }
-
-        const headers = [
-            "ID",
-            "Date",
-            "Pond",
-            "Type",
-            "Biomass_kg",
-            "Count_pcs_per_kg",
-            "Price_per_kg",
-            "Feed_Consumed_kg",
-            "ABW_g",
-            "Total_Pieces",
-            "Total_Value_INR"
-        ];
-
-        const rows = snapshot.docs.map(doc => {
-            const d = doc.data();
-            return [
-                `"${doc.id}"`,
-                `"${d.date || ''}"`,
-                `"${d.pond || ''}"`,
-                `"${d.type || 'Partial Harvest'}"`,
-                d.biomass || 0,
-                d.count || 0,
-                d.price || 0,
-                d.feedConsumed || 0,
-                d.abw || 0,
-                d.totalPieces || 0,
-                d.totalValue || 0
-            ].join(',');
-        });
-
-        const csvContent = [headers.join(','), ...rows].join('\r\n');
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        
-        const downloadAnchor = document.createElement('a');
-        const today = new Date().toISOString().split('T')[0];
-        downloadAnchor.setAttribute("href", url);
-        downloadAnchor.setAttribute("download", `harvest_records_${today}.csv`);
-        document.body.appendChild(downloadAnchor);
-        downloadAnchor.click();
-        downloadAnchor.remove();
-        URL.revokeObjectURL(url);
-    } catch (err) {
-        console.error("CSV Backup error:", err);
-        alert("Failed to export CSV: " + err.message);
-    }
-}
-
-// 2. Parse uploaded .csv file and restore records into Firestore
-async function restoreHarvestData(event) {
-    const file = event.target.files[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = async function(e) {
-        try {
-            const text = e.target.result;
-            const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
-
-            if (lines.length < 2) {
-                alert("CSV file is empty or missing data rows.");
-                return;
-            }
-
-            const parseCSVLine = (line) => {
-                const values = [];
-                let current = '';
-                let inQuotes = false;
-                for (let i = 0; i < line.length; i++) {
-                    const char = line[i];
-                    if (char === '"') {
-                        inQuotes = !inQuotes;
-                    } else if (char === ',' && !inQuotes) {
-                        values.push(current.trim().replace(/^"|"$/g, ''));
-                        current = '';
-                    } else {
-                        current += char;
-                    }
-                }
-                values.push(current.trim().replace(/^"|"$/g, ''));
-                return values;
-            };
-
-            const dataRows = lines.slice(1);
-            const confirmRestore = confirm(`Found ${dataRows.length} harvest record(s) in CSV. Restore to database?`);
-            if (!confirmRestore) {
-                event.target.value = '';
-                return;
-            }
-
-            const batch = db.batch();
-
-            dataRows.forEach(rowStr => {
-                const cols = parseCSVLine(rowStr);
-                if (cols.length < 7) return;
-
-                const [id, date, pond, type, biomass, count, price, feedConsumed, abw, totalPieces, totalValue] = cols;
-
-                const docRef = (id && id.trim() !== '') 
-                    ? db.collection('harvestRecords').doc(id.trim()) 
-                    : db.collection('harvestRecords').doc();
-
-                batch.set(docRef, {
-                    date: date || '',
-                    pond: pond || '',
-                    type: type || 'Partial Harvest',
-                    biomass: parseFloat(biomass) || 0,
-                    count: parseFloat(count) || 0,
-                    price: parseFloat(price) || 0,
-                    feedConsumed: parseFloat(feedConsumed) || 0,
-                    abw: parseFloat(abw) || (parseFloat(count) > 0 ? parseFloat((1000 / parseFloat(count)).toFixed(2)) : 0),
-                    totalPieces: parseInt(totalPieces) || Math.round((parseFloat(biomass) || 0) * (parseFloat(count) || 0)),
-                    totalValue: parseInt(totalValue) || Math.round((parseFloat(biomass) || 0) * (parseFloat(price) || 0)),
-                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-                }, { merge: true });
-            });
-
-            await batch.commit();
-            alert(`Successfully restored records from CSV!`);
-        } catch (err) {
-            console.error("CSV Restore error:", err);
-            alert("Failed to restore CSV: " + err.message);
-        } finally {
-            event.target.value = '';
-        }
-    };
-    reader.readAsText(file);
-}
-// Automatically start listening immediately
-listenToWaterRecords();
-        // ==========================================
-// HARVEST TAB JAVASCRIPT LOGIC
-// ==========================================
-
-// 1. Calculate ABW (1000 / Count), Pieces, and Final Value
-window.calcHarvestMetrics = function() {
-    const countInput = document.getElementById('harvestCount');
-    const biomassInput = document.getElementById('harvestBiomass');
-    const priceInput = document.getElementById('harvestPrice');
-
-    const count = countInput ? parseFloat(countInput.value) : 0;
-    const biomass = biomassInput ? parseFloat(biomassInput.value) : 0;
-    const price = priceInput ? parseFloat(priceInput.value) : 0;
-
-    // Harvest ABW = 1000 / Count
-    const abw = (count > 0) ? (1000 / count).toFixed(2) + ' g' : '—';
-    const pieces = (biomass > 0 && count > 0) ? Math.round(biomass * count).toLocaleString('en-IN') : '—';
-    const val = (biomass > 0 && price > 0) ? '₹' + Math.round(biomass * price).toLocaleString('en-IN') : '₹0';
-
-    const abwEl = document.getElementById('liveHarvestAbw');
-    const piecesEl = document.getElementById('liveHarvestPieces');
-    const valEl = document.getElementById('liveHarvestValue');
-
-    if (abwEl) abwEl.textContent = abw;
-    if (piecesEl) piecesEl.textContent = pieces;
-    if (valEl) valEl.textContent = val;
-};
-
-function resetHarvestForm() {
-    const abwEl = document.getElementById('liveHarvestAbw');
-    const piecesEl = document.getElementById('liveHarvestPieces');
-    const valEl = document.getElementById('liveHarvestValue');
-    if (abwEl) abwEl.textContent = '—';
-    if (piecesEl) piecesEl.textContent = '—';
-    if (valEl) valEl.textContent = '₹0';
-}
-
-// 2. Fetch Ponds (Clones from your working waterPondInput dropdown)
-function populateHarvestPonds() {
-    const select = document.getElementById('harvestPond');
-    if (!select) return;
-    select.innerHTML = '<option value="">Select Pond</option>';
-
-    const donor = document.getElementById('waterPondInput') || document.getElementById('treatmentPondSelect');
-    if (donor && donor.options.length > 1) {
-        Array.from(donor.options).forEach(opt => {
-            if (opt.value && opt.value !== '') {
-                const newOpt = document.createElement('option');
-                newOpt.value = opt.value;
-                newOpt.textContent = opt.textContent;
-                select.appendChild(newOpt);
-            }
-        });
-        return;
-    }
-
-    if (typeof ponds !== 'undefined' && Array.isArray(ponds)) {
-        ponds.forEach(p => {
-            const val = typeof p === 'object' ? (p.id || p.name) : p;
-            if (val) {
-                const opt = document.createElement('option');
-                opt.value = val;
-                opt.textContent = val.toString().startsWith('Pond') ? val : `Pond ${val}`;
-                select.appendChild(opt);
-            }
-        });
-    }
-}
-
-// 3. Save Harvest Event to Firestore
-async function saveHarvestEvent(e) {
-    e.preventDefault();
-    const biomass = parseFloat(document.getElementById('harvestBiomass').value) || 0;
-    const count = parseFloat(document.getElementById('harvestCount').value) || 0;
-    const price = parseFloat(document.getElementById('harvestPrice').value) || 0;
-    const feed = parseFloat(document.getElementById('harvestTotalFeed').value) || 0;
-
-    const record = {
-        pond: document.getElementById('harvestPond').value,
-        date: document.getElementById('harvestDate').value,
-        type: document.getElementById('harvestType').value,
-        biomass: biomass,
-        count: count,
-        price: price,
-        feedConsumed: feed,
-        abw: count > 0 ? parseFloat((1000 / count).toFixed(2)) : 0,
-        totalPieces: Math.round(biomass * count),
-        totalValue: Math.round(biomass * price),
-        createdAt: firebase.firestore.FieldValue.serverTimestamp()
-    };
-
-    try {
-        await db.collection('harvestRecords').add(record);
-        e.target.reset();
-        resetHarvestForm();
-        alert("Harvest record saved successfully!");
-    } catch (err) {
-        console.error("Error saving harvest log:", err);
-        alert("Failed to save harvest log: " + err.message);
-    }
-}
-
-// 4. Real-time Firestore Listener
-function listenToHarvestRecords() {
-    if (typeof db === 'undefined') return;
-    db.collection('harvestRecords')
-      .orderBy('date', 'desc')
-      .onSnapshot(snapshot => {
-          const records = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-          renderHarvestList(records);
-      }, err => {
-          console.error("Harvest listener error:", err);
-      });
-}
-
-function renderHarvestList(records = []) {
-    const listEl = document.getElementById('harvestRecordsList');
-    if (!listEl) return;
-
-    if (records.length === 0) {
-        listEl.innerHTML = '<div class="text-center py-6 text-xs text-slate-400 font-medium">No harvest records saved yet.</div>';
-        return;
-    }
-
-    listEl.innerHTML = records.map(r => `
-        <div class="bg-white p-3.5 rounded-2xl border border-slate-100 shadow-sm space-y-2">
-            <div class="flex justify-between items-center">
-                <div class="flex items-center gap-1.5">
-                    <span class="text-xs font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded-lg">Pond ${r.pond}</span>
-                    <span class="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-lg">${r.type}</span>
-                </div>
-                <span class="text-xs font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg">₹${(r.totalValue || 0).toLocaleString('en-IN')}</span>
-            </div>
-            <div class="grid grid-cols-4 gap-2 pt-1 text-center">
-                <div class="bg-slate-50 p-2 rounded-xl border border-slate-100">
-                    <span class="text-[9px] text-slate-400 font-bold block">BIOMASS</span>
-                    <span class="text-xs font-black text-slate-700">${r.biomass} kg</span>
-                </div>
-                <div class="bg-slate-50 p-2 rounded-xl border border-slate-100">
-                    <span class="text-[9px] text-slate-400 font-bold block">COUNT</span>
-                    <span class="text-xs font-black text-slate-700">${r.count} pc</span>
-                </div>
-                <div class="bg-slate-50 p-2 rounded-xl border border-slate-100">
-                    <span class="text-[9px] text-slate-400 font-bold block">ABW</span>
-                    <span class="text-xs font-black text-slate-700">${r.abw}g</span>
-                </div>
-                <div class="bg-slate-50 p-2 rounded-xl border border-slate-100">
-                    <span class="text-[9px] text-slate-400 font-bold block">RATE</span>
-                    <span class="text-xs font-black text-slate-700">₹${r.price}</span>
-                </div>
-            </div>
-        </div>
-    `).join('');
-}
-
-// 5. Initialize
-listenToHarvestRecords();
-const defaultHarvestDate = document.getElementById('harvestDate');
-if (defaultHarvestDate) defaultHarvestDate.value = new Date().toISOString().split('T')[0];
     </script>
-    <!-- Water Quality Entry Modal -->
-    <div id="waterModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[9998] hidden flex items-center justify-center p-4">
-        <div class="bg-white w-full max-w-sm rounded-2xl p-5 shadow-2xl border border-slate-100 max-h-[90vh] overflow-y-auto">
-            <div class="flex justify-between items-center mb-4">
-                <h3 class="text-base font-bold text-slate-800">Log Water Reading</h3>
-                <button onclick="closeWaterModal()" class="text-slate-400 hover:text-slate-600 font-bold text-xl leading-none">&times;</button>
-            </div>
-
-            <form onsubmit="saveWaterRecord(event)" class="space-y-3">
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Pond Number</label>
-                    <select id="waterPondInput" required class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-medium bg-white focus:border-blue-600 focus:outline-none cursor-pointer">
-                        <option value="">Select Active Pond</option>
-                    </select>
-                </div>
-
-                <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-600 uppercase mb-1">DO (ppm)</label>
-                        <input type="number" step="0.1" id="waterDOInput" placeholder="e.g. 5.5" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-medium focus:border-blue-600 focus:outline-none">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-600 uppercase mb-1">pH Level</label>
-                        <input type="number" step="0.1" id="waterPHInput" placeholder="e.g. 7.8" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-medium focus:border-blue-600 focus:outline-none">
-                    </div>
-                </div>
-
-                <div class="grid grid-cols-2 gap-2">
-                    <div>
-                        <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Salinity (ppt)</label>
-                        <input type="number" step="0.5" id="waterSalinityInput" placeholder="e.g. 15" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-medium focus:border-blue-600 focus:outline-none">
-                    </div>
-                    <div>
-                        <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Ammonia / TAN</label>
-                        <input type="number" step="0.05" id="waterAmmoniaInput" placeholder="e.g. 0.2" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-medium focus:border-blue-600 focus:outline-none">
-                    </div>
-                </div>
-
-                <div>
-                    <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Temperature (°C)</label>
-                    <input type="number" step="0.5" id="waterTempInput" placeholder="e.g. 29" class="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm font-medium focus:border-blue-600 focus:outline-none">
-                </div>
-
-                <div class="flex space-x-2 pt-3">
-                    <button type="button" onclick="closeWaterModal()" class="flex-1 py-2.5 text-xs font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl transition">
-                        Cancel
-                    </button>
-                    <button type="submit" class="flex-1 py-2.5 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-sm transition">
-                        Save Record
-                    </button>
-                </div>
-            </form>
-        </div>
-    </div>
 </body>
 </html>
