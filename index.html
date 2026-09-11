@@ -1379,8 +1379,38 @@
             const latestSystemDate = getSystemLatestDate();
             const formattedDate = formatDateDisplay(latestSystemDate);
 
+            // Farm-level summary card — kept above the individual pond cards.
+            // Total Expense is intentionally a placeholder for the future laptop-app link.
+            const totalFarmFeed = feedEntries.reduce((acc, curr) => {
+                return acc + (curr.fasting ? 0 : (parseFloat(curr.qty) || 0));
+            }, 0);
+
+            const farmSummaryCard = document.createElement('div');
+            farmSummaryCard.className = 'bg-white p-5 rounded-2xl shadow-sm border border-slate-100';
+            farmSummaryCard.innerHTML = `
+                <div class="flex items-center justify-between mb-3">
+                    <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wide">FARM SUMMARY</h3>
+                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">All Ponds</span>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                        <span class="text-xs text-slate-500 block">Total Expense</span>
+                        <span id="farmTotalExpense" class="text-lg font-extrabold text-slate-800">₹ 0</span>
+                    </div>
+                    <div class="bg-blue-50 p-3 rounded-xl border border-blue-100">
+                        <span class="text-xs text-slate-500 block">Total Feed</span>
+                        <span id="farmTotalFeed" class="text-lg font-extrabold text-blue-600">${totalFarmFeed.toFixed(1)} kg</span>
+                    </div>
+                </div>
+            `;
+            container.appendChild(farmSummaryCard);
+
             if (ponds.length === 0) {
-                container.innerHTML = `<div class="bg-white p-6 rounded-2xl border border-slate-100 text-center text-slate-400 text-sm">No ponds active.</div>`;
+                const emptyCard = document.createElement('div');
+                emptyCard.className = 'bg-white p-6 rounded-2xl border border-slate-100 text-center text-slate-400 text-sm';
+                emptyCard.innerText = 'No ponds active.';
+                container.appendChild(emptyCard);
+                updateHeaderDate();
                 return;
             }
 
