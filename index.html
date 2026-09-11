@@ -33,6 +33,18 @@
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
             overscroll-behavior-y: contain;
+            scroll-padding-top: var(--app-header-height, 0px);
+        }
+
+        /* The header is fixed, so the scroll area must start exactly below it.
+           This prevents the Feed card / Record Feed button from sitting underneath
+           the blue header and navigation on iPhone Safari. */
+        #mainAppContainer {
+            --app-header-height: 0px;
+        }
+
+        #mainAppContainer .app-scroll-content {
+            padding-top: var(--app-header-height, 0px) !important;
         }
 
         @media screen and (max-width: 768px) {
@@ -145,7 +157,7 @@
 
         <!-- Scrollable Main Content Area -->
         <div class="app-scroll-content flex-1 max-w-md w-full mx-auto p-4 pb-28"
-             style="padding-top: 138px;">
+             style="padding-top: 0;">
             
             <!-- 1. Home View -->
             <div id="homeView" class="space-y-4">
@@ -716,9 +728,10 @@
 
                 <div class="relative w-64 h-64 mx-auto bg-slate-100 rounded-full border-2 border-slate-200 flex items-center justify-center shadow-inner" id="clockFace">
                     <svg class="absolute inset-0 w-full h-full pointer-events-none" viewBox="0 0 256 256">
-                        <line id="clockHandLine" x1="128" y1="128" x2="128" y2="52" stroke="#2563eb" stroke-width="2.5" stroke-linecap="round" />
-                        <circle id="clockHandDot" cx="128" cy="52" r="14" fill="#2563eb" opacity="0.15" />
-                        <circle cx="128" cy="128" r="5" fill="#2563eb" />
+                        <line id="clockHandLine" x1="128" y1="128" x2="128" y2="46" stroke="#2563eb" stroke-width="4" stroke-linecap="round" />
+                        <circle id="clockHandTip" cx="128" cy="46" r="9" fill="#2563eb" stroke="#ffffff" stroke-width="3" />
+                        <circle id="clockHandDot" cx="128" cy="46" r="15" fill="#2563eb" opacity="0.10" />
+                        <circle cx="128" cy="128" r="7" fill="#2563eb" stroke="#ffffff" stroke-width="2" />
                     </svg>
                 </div>
 
@@ -792,6 +805,12 @@
             if (user) {
                 authScreen.classList.add('hidden');
                 mainApp.classList.remove('hidden');
+                // The header was hidden before authentication, so measure it only
+                // after the main app becomes visible.
+                requestAnimationFrame(() => {
+                    syncAppLayout();
+                    setTimeout(syncAppLayout, 100);
+                });
                 if (!isSyncInitialized) {
                     isSyncInitialized = true;
                     initRealtimeSync();
@@ -1258,7 +1277,20 @@
             });
         }
 
+        function syncAppLayout() {
+            const app = document.getElementById('mainAppContainer');
+            const header = document.querySelector('.app-fixed-header');
+            if (!app || !header) return;
+            const height = Math.ceil(header.getBoundingClientRect().height);
+            app.style.setProperty('--app-header-height', `${height}px`);
+        }
+
+        // Keep the scroll content exactly below the fixed header on iPhone/iPad.
+        window.addEventListener('resize', syncAppLayout);
+        window.addEventListener('orientationchange', () => setTimeout(syncAppLayout, 250));
+
         function switchTab(tab) {
+            syncAppLayout();
             const tabs = ['home', 'pond', 'feed', 'sampling', 'treatment', 'harvest'];
             const bottomBar = document.getElementById('bottomActionBar');
             const headerPondSection = document.getElementById('headerPondSection');
@@ -2688,12 +2720,26 @@
             document.getElementById('selectedTimeString').innerText = `${h}:${m} ${period}`;
         }
         function updateClockHand(idx, total) {
+            // Put the hand tip at the exact center of the selected clock number.
+            // The numbers are positioned at radius 82, so the hand uses the same radius.
             const angle = (idx * (360 / total)) * (Math.PI / 180);
-            const x = 128 + 72 * Math.sin(angle);
-            const y = 128 - 72 * Math.cos(angle);
-            document.getElementById('clockHandLine').setAttribute('x2', x);
-            document.getElementById('clockHandDot').setAttribute('cx', x);
-            document.getElementById('clockHandDot').setAttribute('cy', y);
+            const x = 128 + 82 * Math.sin(angle);
+            const y = 128 - 82 * Math.cos(angle);
+            const line = document.getElementById('clockHandLine');
+            const tip = document.getElementById('clockHandTip');
+            const glow = document.getElementById('clockHandDot');
+            if (line) {
+                line.setAttribute('x2', x);
+                line.setAttribute('y2', y);
+            }
+            if (tip) {
+                tip.setAttribute('cx', x);
+                tip.setAttribute('cy', y);
+            }
+            if (glow) {
+                glow.setAttribute('cx', x);
+                glow.setAttribute('cy', y);
+            }
         }
         function renderClockHours() {
             const face = document.getElementById('clockFace');
@@ -2743,6 +2789,12 @@
                 document.getElementById('treatmentOptionsList')?.classList.add('hidden');
             }
         });
+        document.addEventListener('DOMContentLoaded', () => {
+            syncAppLayout();
+            setTimeout(syncAppLayout, 100);
+            setTimeout(syncAppLayout, 500);
+        });
+
     </script>
 </body>
 </html>
