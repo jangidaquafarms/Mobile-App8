@@ -107,7 +107,7 @@
                 </div>
             </div>
 
-            <!-- Navigation Tabs (Added Harvest Tab) -->
+            <!-- Navigation Tabs -->
             <div class="bg-white border-b border-slate-200">
                 <div class="max-w-md mx-auto flex justify-between text-sm font-medium text-slate-500 px-2 overflow-x-auto no-scrollbar">
                     <button onclick="switchTab('home')" id="tabHome" class="py-3 px-2 text-blue-600 border-b-2 border-blue-600 font-semibold whitespace-nowrap">Home</button>
@@ -157,7 +157,6 @@
                 <div class="flex justify-between items-center bg-white p-2.5 rounded-xl border border-slate-100 shadow-sm gap-2">
                     <span class="text-xs font-bold text-slate-500 uppercase">Feed Logs</span>
                     <div class="flex items-center gap-1.5">
-                        <!-- Restore Button -->
                         <button onclick="document.getElementById('feedRestoreInput').click()" class="text-xs font-semibold text-purple-700 bg-purple-50 px-2.5 py-1.5 rounded-lg border border-purple-200 hover:bg-purple-100 transition shadow-xs flex items-center gap-1" title="Restore Feed Logs from CSV">
                             <span>📤</span> Restore
                         </button>
@@ -203,7 +202,6 @@
                         </select>
                     </div>
                     <div class="flex items-center gap-1.5">
-                        <!-- Restore Button -->
                         <button onclick="document.getElementById('samplingRestoreInput').click()" class="text-xs font-semibold text-purple-700 bg-purple-50 px-2.5 py-1.5 rounded-lg border border-purple-200 hover:bg-purple-100 transition shadow-xs flex items-center gap-1" title="Restore Sampling Logs from CSV">
                             <span>📤</span> Restore
                         </button>
@@ -238,7 +236,6 @@
                         </select>
                     </div>
                     <div class="flex items-center gap-1.5">
-                        <!-- Restore Button -->
                         <button onclick="document.getElementById('treatmentRestoreInput').click()" class="text-xs font-semibold text-purple-700 bg-purple-50 px-2.5 py-1.5 rounded-lg border border-purple-200 hover:bg-purple-100 transition shadow-xs flex items-center gap-1" title="Restore Treatment Logs from CSV">
                             <span>📤</span> Restore
                         </button>
@@ -301,7 +298,64 @@
             </div>
         </div>
 
-        <!-- Record Harvest Event Modal (Matches User Screenshot) -->
+        <!-- Configure Pond Cycle Modal (Updated with Hatchery Name) -->
+        <div id="pondModal" class="fixed inset-0 bg-black/60 hidden flex items-end sm:items-center justify-center z-50">
+            <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl max-h-[90vh] overflow-y-auto p-5 shadow-2xl">
+                <div class="flex justify-between items-center border-b pb-3 mb-4">
+                    <div>
+                        <h2 id="pondModalTitleText" class="text-base font-bold text-slate-800">Configure Pond Cycle</h2>
+                        <p id="pondModalSubtitleText" class="text-xs text-slate-500">Configure pond specs, hatchery & stocking details</p>
+                    </div>
+                    <button onclick="closePondModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
+                </div>
+
+                <form id="pondForm" onsubmit="handlePondSubmit(event)" class="space-y-4 text-sm">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Pond Name *</label>
+                            <input type="text" id="newPondName" placeholder="e.g. Pond 1" required class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 uppercase font-semibold">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Hatchery Name</label>
+                            <input type="text" id="pondHatchery" placeholder="e.g. Ravi Hatcheries" class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 font-medium">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Length (m) *</label>
+                            <input type="number" step="0.1" id="pondLength" placeholder="70" required oninput="calcPondArea()" class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Breadth (m) *</label>
+                            <input type="number" step="0.1" id="pondBreadth" placeholder="42" required oninput="calcPondArea()" class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Calculated Area (m²)</label>
+                            <input type="text" id="pondArea" readonly placeholder="Auto" class="w-full border border-slate-200 p-2.5 rounded-lg bg-slate-100 text-slate-700 font-bold outline-none">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Stocking Date *</label>
+                            <input type="date" id="pondStockingDate" required class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Stocking Count (Pcs) *</label>
+                            <input type="number" id="pondStockingCount" placeholder="e.g. 125000" required class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-2 pt-2">
+                        <button type="submit" id="pondModalSubmitBtn" class="bg-blue-600 hover:bg-blue-700 text-white py-2.5 px-6 rounded-xl font-bold shadow-md transition text-xs">Save Pond Profile</button>
+                        <button type="button" onclick="closePondModal()" class="text-slate-600 hover:text-slate-800 px-4 py-2.5 text-xs font-semibold">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Record Harvest Event Modal -->
         <div id="harvestModal" class="fixed inset-0 bg-black/60 hidden flex items-end sm:items-center justify-center z-50">
             <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl max-h-[90vh] overflow-y-auto p-5 shadow-2xl">
                 <div class="flex justify-between items-center border-b pb-3 mb-4">
@@ -351,7 +405,6 @@
                         <input type="number" step="0.1" id="harvestFeedConsumed" placeholder="2308" class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 text-xs font-medium">
                     </div>
 
-                    <!-- Computed Indicator Card (from user UI design) -->
                     <div class="bg-emerald-50/70 border border-emerald-200 rounded-xl p-3 flex justify-between items-center text-center">
                         <div class="flex-1">
                             <span class="text-[10px] uppercase font-bold text-emerald-800 tracking-wider block">Harvest ABW</span>
@@ -527,7 +580,7 @@
                         </div>
                     </div>
 
-                    <!-- Net Feed Consumption (Directly below ABW) -->
+                    <!-- Net Feed Consumption -->
                     <div>
                         <label class="block text-xs font-semibold text-slate-600 mb-1">Net Feed Consumption (kg)</label>
                         <div class="relative">
@@ -542,53 +595,6 @@
                     </div>
 
                     <button type="submit" id="samplingSubmitBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold shadow-md transition">Save Sample</button>
-                </form>
-            </div>
-        </div>
-
-        <!-- Create / Edit Pond Modal -->
-        <div id="pondModal" class="fixed inset-0 bg-black/60 hidden flex items-end sm:items-center justify-center z-50">
-            <div class="bg-white w-full max-w-md rounded-t-2xl sm:rounded-2xl max-h-[90vh] overflow-y-auto p-5 shadow-2xl">
-                <div class="flex justify-between items-center border-b pb-3 mb-4">
-                    <div>
-                        <h2 id="pondModalTitleText" class="text-base font-bold text-slate-800">Create New Pond</h2>
-                        <p id="pondModalSubtitleText" class="text-xs text-slate-500">Configure pond specs & stocking details</p>
-                    </div>
-                    <button onclick="closePondModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
-                </div>
-
-                <form id="pondForm" onsubmit="handlePondSubmit(event)" class="space-y-4 text-sm">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Pond Name / ID *</label>
-                        <input type="text" id="newPondName" placeholder="e.g. P6" required class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 uppercase font-semibold">
-                    </div>
-
-                    <div class="grid grid-cols-3 gap-2">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">Length (m) *</label>
-                            <input type="number" step="0.1" id="pondLength" placeholder="L" required oninput="calcPondArea()" class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">Breadth (m) *</label>
-                            <input type="number" step="0.1" id="pondBreadth" placeholder="B" required oninput="calcPondArea()" class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">Area (m²)</label>
-                            <input type="text" id="pondArea" readonly placeholder="Auto L×B" class="w-full border border-slate-200 p-2.5 rounded-lg bg-slate-100 text-slate-700 font-bold outline-none">
-                        </div>
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Stocking Date *</label>
-                        <input type="date" id="pondStockingDate" required class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
-                    </div>
-
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Stocking Count (PL Seeds) *</label>
-                        <input type="number" id="pondStockingCount" placeholder="e.g. 150000" required class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
-                    </div>
-
-                    <button type="submit" id="pondModalSubmitBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold shadow-md transition">Save Pond</button>
                 </form>
             </div>
         </div>
@@ -787,11 +793,11 @@
         }
 
         let ponds = JSON.parse(localStorage.getItem('bc_ponds')) || [
-            { id: 'P1', length: 100, breadth: 50, area: 5000, stockingDate: '2026-07-28', stockingCount: 150000 },
-            { id: 'P2', length: 100, breadth: 60, area: 6000, stockingDate: '2026-07-28', stockingCount: 180000 },
-            { id: 'P3', length: 80, breadth: 50, area: 4000, stockingDate: '2026-08-01', stockingCount: 120000 },
-            { id: 'P4', length: 120, breadth: 60, area: 7200, stockingDate: '2026-08-05', stockingCount: 200000 },
-            { id: 'P5', length: 90, breadth: 50, area: 4500, stockingDate: '2026-08-10', stockingCount: 135000 }
+            { id: 'P1', hatchery: 'Ravi Hatcheries', length: 100, breadth: 50, area: 5000, stockingDate: '2026-07-28', stockingCount: 150000 },
+            { id: 'P2', hatchery: '', length: 100, breadth: 60, area: 6000, stockingDate: '2026-07-28', stockingCount: 180000 },
+            { id: 'P3', hatchery: '', length: 80, breadth: 50, area: 4000, stockingDate: '2026-08-01', stockingCount: 120000 },
+            { id: 'P4', hatchery: '', length: 120, breadth: 60, area: 7200, stockingDate: '2026-08-05', stockingCount: 200000 },
+            { id: 'P5', hatchery: '', length: 90, breadth: 50, area: 4500, stockingDate: '2026-08-10', stockingCount: 135000 }
         ];
 
         let feedEntries = JSON.parse(localStorage.getItem('bc_feeds')) || [];
@@ -1329,7 +1335,10 @@
                 card.innerHTML = `
                     <div class="flex justify-between items-start">
                         <div>
-                            <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wide">${pondId} DASHBOARD SUMMARY</h3>
+                            <div class="flex items-center gap-2">
+                                <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wide">${pondId} DASHBOARD SUMMARY</h3>
+                                ${pond.hatchery ? `<span class="text-[10px] bg-indigo-50 border border-indigo-100 text-indigo-700 font-bold px-2 py-0.5 rounded-full">${pond.hatchery}</span>` : ''}
+                            </div>
                             <p class="text-xs text-slate-400 font-medium mt-0.5">${formattedDate}</p>
                         </div>
                         <span class="text-lg font-black text-emerald-600">DOC ${doc}</span>
@@ -1367,6 +1376,7 @@
                         <div class="flex items-center gap-2">
                             <span class="bg-blue-600 text-white font-extrabold px-2.5 py-1 rounded-lg text-xs">${p.id}</span>
                             <span class="text-xs text-slate-500 font-semibold">${p.length}m × ${p.breadth}m (${p.area.toLocaleString()} m²)</span>
+                            ${p.hatchery ? `<span class="text-[10px] bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold px-2 py-0.5 rounded-full">${p.hatchery}</span>` : ''}
                         </div>
                         <div class="flex items-center gap-3">
                             <span class="text-sm font-black text-emerald-600">DOC ${doc}</span>
@@ -1989,6 +1999,7 @@
         function handlePondSubmit(e) {
             e.preventDefault();
             const name = document.getElementById('newPondName').value.trim().toUpperCase();
+            const hatchery = document.getElementById('pondHatchery').value.trim();
             const length = parseFloat(document.getElementById('pondLength').value) || 0;
             const breadth = parseFloat(document.getElementById('pondBreadth').value) || 0;
             const area = length * breadth;
@@ -2000,7 +2011,7 @@
                 return;
             }
 
-            const pondObj = { id: name, length, breadth, area, stockingDate, stockingCount };
+            const pondObj = { id: name, hatchery, length, breadth, area, stockingDate, stockingCount };
             
             if (editingPondId !== null && name !== editingPondId) {
                 deletePondFromDb(editingPondId);
@@ -2085,7 +2096,18 @@
             const headers = ["Treatment ID", "Date", "Pond No", "Category", "Product Name", "Quantity", "Unit", "Purpose", "DOC", "Notes"];
             const rows = data.map(t => {
                 const pondObj = ponds.find(p => p.id === t.pond);
-                return [escapeCSV(t.id), escapeCSV(t.date), escapeCSV(t.pond), escapeCSV(t.category || "Probiotics"), escapeCSV(t.product), escapeCSV(t.qty), escapeCSV(t.unit || determineUnit(t.product)), escapeCSV(t.purpose), escapeCSV(pondObj ? calculateDOC(pondObj.stockingDate, t.date) : ""), escapeCSV(t.notes || "")].join(",");
+                return [
+                    escapeCSV(t.id),
+                    escapeCSV(t.date),
+                    escapeCSV(t.pond),
+                    escapeCSV(t.category || "Probiotics"),
+                    escapeCSV(t.product),
+                    escapeCSV(t.qty),
+                    escapeCSV(t.unit || determineUnit(t.product)),
+                    escapeCSV(t.purpose),
+                    escapeCSV(pondObj ? calculateDOC(pondObj.stockingDate, t.date) : ""),
+                    escapeCSV(t.notes || "")
+                ].join(",");
             });
             downloadCSVFile([headers.join(","), ...rows].join("\r\n"), `Treatment_Backup_${new Date().toISOString().split('T')[0]}.csv`);
         }
@@ -2268,6 +2290,48 @@
             reader.readAsText(file);
         }
 
+        function openPondModal(pondId = null) {
+            document.getElementById('pondModal').classList.remove('hidden');
+            const modalTitle = document.getElementById('pondModalTitleText');
+            const submitBtn = document.getElementById('pondModalSubmitBtn');
+
+            if (pondId !== null) {
+                editingPondId = pondId;
+                modalTitle.innerText = `Configure Pond Cycle (${pondId})`;
+                submitBtn.innerText = 'Save Pond Profile';
+                const p = ponds.find(item => item.id === pondId);
+                if (p) {
+                    document.getElementById('newPondName').value = p.id;
+                    document.getElementById('pondHatchery').value = p.hatchery || '';
+                    document.getElementById('pondLength').value = p.length;
+                    document.getElementById('pondBreadth').value = p.breadth;
+                    calcPondArea();
+                    document.getElementById('pondStockingDate').value = p.stockingDate;
+                    document.getElementById('pondStockingCount').value = p.stockingCount;
+                }
+            } else {
+                editingPondId = null;
+                modalTitle.innerText = 'Configure Pond Cycle';
+                submitBtn.innerText = 'Save Pond Profile';
+                document.getElementById('pondForm').reset();
+                document.getElementById('pondArea').value = '';
+                document.getElementById('newPondName').value = 'P' + (ponds.length + 1);
+                document.getElementById('pondHatchery').value = '';
+                document.getElementById('pondStockingDate').value = getSystemLatestDate();
+            }
+        }
+
+        function closePondModal() {
+            document.getElementById('pondModal').classList.add('hidden');
+        }
+
+        function calcPondArea() {
+            const length = parseFloat(document.getElementById('pondLength').value) || 0;
+            const breadth = parseFloat(document.getElementById('pondBreadth').value) || 0;
+            const area = length * breadth;
+            document.getElementById('pondArea').value = area > 0 ? area.toFixed(1) + ' m²' : '';
+        }
+
         function selectTreatmentCategory(cat, preserveValue = false) {
             ['Probiotics', 'Medicine', 'Fertilizers'].forEach(c => {
                 const label = document.getElementById('catLabel' + c);
@@ -2411,46 +2475,6 @@
             const weight = parseFloat(document.getElementById('sampleWeight').value) || 0;
             const count = parseInt(document.getElementById('sampleCount').value, 10) || 0;
             document.getElementById('sampleABW').value = (weight > 0 && count > 0) ? (weight / count).toFixed(2) : '';
-        }
-
-        function openPondModal(pondId = null) {
-            document.getElementById('pondModal').classList.remove('hidden');
-            const modalTitle = document.getElementById('pondModalTitleText');
-            const submitBtn = document.getElementById('pondModalSubmitBtn');
-
-            if (pondId !== null) {
-                editingPondId = pondId;
-                modalTitle.innerText = `Edit Pond (${pondId})`;
-                submitBtn.innerText = 'Update Pond';
-                const p = ponds.find(item => item.id === pondId);
-                if (p) {
-                    document.getElementById('newPondName').value = p.id;
-                    document.getElementById('pondLength').value = p.length;
-                    document.getElementById('pondBreadth').value = p.breadth;
-                    calcPondArea();
-                    document.getElementById('pondStockingDate').value = p.stockingDate;
-                    document.getElementById('pondStockingCount').value = p.stockingCount;
-                }
-            } else {
-                editingPondId = null;
-                modalTitle.innerText = 'Create New Pond';
-                submitBtn.innerText = 'Save Pond';
-                document.getElementById('pondForm').reset();
-                document.getElementById('pondArea').value = '';
-                document.getElementById('newPondName').value = 'P' + (ponds.length + 1);
-                document.getElementById('pondStockingDate').value = getSystemLatestDate();
-            }
-        }
-
-        function closePondModal() {
-            document.getElementById('pondModal').classList.add('hidden');
-        }
-
-        function calcPondArea() {
-            const length = parseFloat(document.getElementById('pondLength').value) || 0;
-            const breadth = parseFloat(document.getElementById('pondBreadth').value) || 0;
-            const area = length * breadth;
-            document.getElementById('pondArea').value = area > 0 ? area.toFixed(1) + ' m²' : '';
         }
 
         function openModal(id = null) {
@@ -2665,6 +2689,7 @@
             const x = 128 + 72 * Math.sin(angle);
             const y = 128 - 72 * Math.cos(angle);
             document.getElementById('clockHandLine').setAttribute('x2', x);
+            document.getElementById('clockHandLine').setAttribute('y2', y);
             document.getElementById('clockHandDot').setAttribute('cx', x);
             document.getElementById('clockHandDot').setAttribute('cy', y);
         }
