@@ -28,23 +28,31 @@
             z-index: 30;
         }
 
+        /* The header is fixed. Keep the content area physically below it rather
+           than using padding-top; this avoids iOS Safari placing the first card
+           underneath the header on initial load or after a tab change. */
+        #mainAppContainer {
+            --app-header-height: 0px;
+            position: relative;
+        }
+
         .app-scroll-content {
+            position: absolute;
+            top: var(--app-header-height, 0px);
+            left: 0;
+            right: 0;
+            bottom: 0;
+            width: 100%;
+            max-width: 28rem;
+            margin-left: auto;
+            margin-right: auto;
             min-height: 0;
+            box-sizing: border-box;
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
             overscroll-behavior-y: contain;
-            scroll-padding-top: var(--app-header-height, 0px);
-        }
-
-        /* The header is fixed, so the scroll area must start exactly below it.
-           This prevents the Feed card / Record Feed button from sitting underneath
-           the blue header and navigation on iPhone Safari. */
-        #mainAppContainer {
-            --app-header-height: 0px;
-        }
-
-        #mainAppContainer .app-scroll-content {
-            padding-top: var(--app-header-height, 0px) !important;
+            scroll-padding-top: 0;
+            padding: 1rem 1rem 7rem !important;
         }
 
         @media screen and (max-width: 768px) {
@@ -1290,7 +1298,6 @@
         window.addEventListener('orientationchange', () => setTimeout(syncAppLayout, 250));
 
         function switchTab(tab) {
-            syncAppLayout();
             const tabs = ['home', 'pond', 'feed', 'sampling', 'treatment', 'harvest'];
             const bottomBar = document.getElementById('bottomActionBar');
             const headerPondSection = document.getElementById('headerPondSection');
@@ -1327,6 +1334,14 @@
                 if (tab === 'harvest') renderHarvestList();
             }
             updateHeaderDate();
+
+            // The Feed header is taller because it contains the pond selector.
+            // Measure only after changing visibility so the scroll area starts at
+            // the true bottom of the header on every tab.
+            requestAnimationFrame(() => {
+                syncAppLayout();
+                setTimeout(syncAppLayout, 50);
+            });
         }
 
         function changePond(pond) {
