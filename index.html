@@ -95,9 +95,6 @@
 #headerCycleControls select{max-width:76px}
 </style>
 <style id="mobile-feed-cycle-note-style">#mobile-feed-cycle-note{display:inline-flex;align-items:center;margin:.4rem 0 .7rem;padding:.3rem .65rem;border:1px solid #dbeafe;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-size:.7rem;font-weight:700}</style>
-<style id="mobile-sampling-cycle-note-style">#mobile-sampling-cycle-note{display:inline-flex;align-items:center;margin:.4rem 0 .7rem;padding:.3rem .65rem;border:1px solid #dbeafe;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-size:.7rem;font-weight:700}</style>
-<style id="mobile-treatment-cycle-note-style">#mobile-treatment-cycle-note{display:inline-flex;align-items:center;margin:.4rem 0 .7rem;padding:.3rem .65rem;border:1px solid #dbeafe;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-size:.7rem;font-weight:700}</style>
-<style id="mobile-harvest-cycle-note-style">#mobile-harvest-cycle-note{display:inline-flex;align-items:center;margin:.4rem 0 .7rem;padding:.3rem .65rem;border:1px solid #dbeafe;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-size:.7rem;font-weight:700}</style>
 </head>
 <body class="bg-slate-50 font-sans h-screen flex flex-col overflow-hidden">
 
@@ -137,7 +134,6 @@
             <div class="bg-blue-600 text-white p-4 shadow-md">
                 <div class="max-w-md mx-auto flex justify-between items-center">
                     <div class="flex items-center space-x-3">
-                        <span class="text-xl font-bold cursor-pointer">&lt;</span>
                         <div>
                             <div id="headerPondSection" class="hidden">
                                 <select id="pondSelector" onchange="changePond(this.value)" class="bg-blue-700 hover:bg-blue-800 text-white font-bold text-lg rounded-xl w-32 px-3 py-1 outline-none cursor-pointer border border-blue-400/60 shadow-sm transition">
@@ -945,18 +941,20 @@
         };
 
         function ensureActiveMobileCycle() {
-            if (!activeMobileCycle || !activeMobileCycle.year || !activeMobileCycle.crop) {
+            if (!Array.isArray(farmCycles)) farmCycles = [];
+            const valid = farmCycles.filter(c => c && c.year && c.crop);
+            if (!valid.length) {
+                // Safe legacy fallback only; mobile never creates/writes a master cycle.
                 activeMobileCycle = { id: `${DEFAULT_CYCLE_YEAR}|crop 1`, year: DEFAULT_CYCLE_YEAR, crop: DEFAULT_CYCLE_CROP };
+                localStorage.setItem('bc_activeCycle', JSON.stringify(activeMobileCycle));
+                return;
             }
-            activeMobileCycle.id = `${Number(activeMobileCycle.year)}|${String(activeMobileCycle.crop).toLowerCase()}`;
-            if (!farmCycles.some(c => String(c.id) === String(activeMobileCycle.id))) {
-                farmCycles.push({
-                    id: activeMobileCycle.id,
-                    year: Number(activeMobileCycle.year),
-                    crop: activeMobileCycle.crop,
-                    name: `${activeMobileCycle.year} ${activeMobileCycle.crop}`
-                });
-            }
+            const currentId = activeMobileCycle && activeMobileCycle.id
+                ? String(activeMobileCycle.id)
+                : '';
+            const found = valid.find(c => String(c.id) === currentId);
+            const selected = found || [...valid].sort((a,b) => Number(b.year) - Number(a.year) || String(b.crop).localeCompare(String(a.crop)))[0];
+            activeMobileCycle = { id: selected.id, year: Number(selected.year), crop: selected.crop };
             localStorage.setItem('bc_farmCycles', JSON.stringify(farmCycles));
             localStorage.setItem('bc_activeCycle', JSON.stringify(activeMobileCycle));
         }
@@ -997,12 +995,6 @@
             harvestPondFilter = 'ALL';
             populateMobileCycleSelectors();
             const feedCycleNote = document.getElementById('mobile-feed-cycle-note-text');
-            const harvestCycleNote = document.getElementById('mobile-harvest-cycle-note-text');
-            if (harvestCycleNote) harvestCycleNote.textContent = `${activeMobileCycle.year} • ${activeMobileCycle.crop}`;
-            const treatmentCycleNote = document.getElementById('mobile-treatment-cycle-note-text');
-            if (treatmentCycleNote) treatmentCycleNote.textContent = `${activeMobileCycle.year} • ${activeMobileCycle.crop}`;
-            const samplingCycleNote = document.getElementById('mobile-sampling-cycle-note-text');
-            if (samplingCycleNote) samplingCycleNote.textContent = `${activeMobileCycle.year} • ${activeMobileCycle.crop}`;
             if (feedCycleNote) feedCycleNote.textContent = `${activeMobileCycle.year} • ${activeMobileCycle.crop}`;
             syncPondDropdown();
             renderAllPondsSummary();
@@ -1074,6 +1066,8 @@
                 if (statusEl) {
                     statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-400"></span> Local`;
                 }
+                vendorTransactions = JSON.parse(localStorage.getItem('bc_vendorTransactions') || '[]');
+                ledgerEntries = JSON.parse(localStorage.getItem('bc_ledgerEntries') || '[]');
                 recalculateCumulatives();
                 refreshAllViews();
                 return;
@@ -1090,8 +1084,9 @@
                     ensureActiveMobileCycle();
                     populateMobileCycleSelectors();
                 } else {
+                    // Laptop is the Year/Crop master. Never create master cycles from mobile.
                     ensureActiveMobileCycle();
-                    farmCycles.forEach(c => db.collection('farmCycles').doc(c.id).set(c));
+                    populateMobileCycleSelectors();
                 }
                 syncPondDropdown();
                 renderPondList();
@@ -1124,13 +1119,21 @@
             }, err => console.error("Feeds sync error:", err));
 
             db.collection('sampling').onSnapshot(snap => {
-                samplingEntries = snap.docs.map(doc => doc.data());
+                samplingEntries = snap.docs.map(doc => {
+                    const d = doc.data();
+                    return { ...d, year: Number(d.year || DEFAULT_CYCLE_YEAR), crop: d.crop || DEFAULT_CYCLE_CROP, cycleId: d.cycleId || `${Number(d.year || DEFAULT_CYCLE_YEAR)}|${String(d.crop || DEFAULT_CYCLE_CROP).toLowerCase()}` };
+                });
                 localStorage.setItem('bc_sampling', JSON.stringify(samplingEntries));
                 renderSamplingList();
             }, err => console.error("Sampling sync error:", err));
 
             db.collection('treatments').onSnapshot(snap => {
-                treatmentEntries = snap.docs.map(doc => doc.data());
+                treatmentEntries = snap.docs.map(doc => {
+                    const d = doc.data() || {};
+                    const year = Number(d.year || DEFAULT_CYCLE_YEAR);
+                    const crop = d.crop || DEFAULT_CYCLE_CROP;
+                    return { ...d, year, crop, cycleId: d.cycleId || `${year}|${String(crop).toLowerCase()}` };
+                });
                 localStorage.setItem('bc_treatments', JSON.stringify(treatmentEntries));
                 renderTreatmentList();
             }, err => console.error("Treatments sync error:", err));
@@ -1139,7 +1142,21 @@
                 harvestEntries = snap.docs.map(doc => doc.data());
                 localStorage.setItem('bc_harvests', JSON.stringify(harvestEntries));
                 renderHarvestList();
+                renderAllPondsSummary();
             }, err => console.error("Harvest sync error:", err));
+
+            // Finance is global: never filter these records by the active Year + Crop.
+            db.collection('vendorTransactions').onSnapshot(snap => {
+                vendorTransactions = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                localStorage.setItem('bc_vendorTransactions', JSON.stringify(vendorTransactions));
+                renderAllPondsSummary();
+            }, err => console.error("Vendor payments sync error:", err));
+
+            db.collection('ledgerEntries').onSnapshot(snap => {
+                ledgerEntries = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                localStorage.setItem('bc_ledgerEntries', JSON.stringify(ledgerEntries));
+                renderAllPondsSummary();
+            }, err => console.error("Ledger expenses sync error:", err));
         }
 
         function refreshAllViews() {
@@ -1228,32 +1245,16 @@
             }
         }
 
-        function getActiveSamplingEntries() {
-            const c = getActiveCycle();
-            return samplingData.filter(s => {
-                if (s.cycleId) return String(s.cycleId) === String(c.id);
-                return Number(s.year || DEFAULT_CYCLE_YEAR) === Number(c.year) &&
-                       String(s.crop || DEFAULT_CYCLE_CROP) === String(c.crop);
-            });
-        }
-
         function saveSamplingToDb(sampleObj) {
             const c = getActiveCycle();
-            const normalized = {
-                ...sampleObj,
-                year: sampleObj.year || Number(c.year),
-                crop: sampleObj.crop || c.crop,
-                cycleId: sampleObj.cycleId || c.id
-            };
+            const normalized = { ...sampleObj, year: Number(c.year), crop: c.crop, cycleId: c.id };
             if (isFirebaseConnected && db) {
                 db.collection('sampling').doc(normalized.id.toString()).set(normalized);
             } else {
-                const idx = samplingData.findIndex(item => item.id === normalized.id);
-                if (idx >= 0) samplingData[idx] = normalized;
-                else samplingData.push(normalized);
-                localStorage.setItem('bc_sampling', JSON.stringify(samplingData));
+                const idx = samplingEntries.findIndex(s => s.id === normalized.id);
+                if (idx >= 0) samplingEntries[idx] = normalized; else samplingEntries.push(normalized);
+                localStorage.setItem('bc_sampling', JSON.stringify(samplingEntries));
                 renderSamplingList();
-                updateSamplingPondDropdown();
             }
         }
 
@@ -1269,28 +1270,33 @@
 
         function getActiveTreatmentEntries() {
             const c = getActiveCycle();
-            return treatmentData.filter(x => {
-                if (x.cycleId) return String(x.cycleId) === String(c.id);
-                return Number(x.year || DEFAULT_CYCLE_YEAR) === Number(c.year) &&
-                       String(x.crop || DEFAULT_CYCLE_CROP) === String(c.crop);
+            return treatmentEntries.filter(item => {
+                if (item.cycleId) return String(item.cycleId) === String(c.id);
+                return Number(item.year || DEFAULT_CYCLE_YEAR) === Number(c.year) &&
+                       String(item.crop || DEFAULT_CYCLE_CROP) === String(c.crop);
             });
         }
 
         function saveTreatmentToDb(treatObj) {
             const c = getActiveCycle();
+            const activePonds = getActivePonds();
+            if (!activePonds.some(p => String(p.id) === String(treatObj.pond))) {
+                alert(`Pond ${treatObj.pond} is not available in ${c.year} • ${c.crop}.`);
+                return;
+            }
             const normalized = {
                 ...treatObj,
-                year: treatObj.year || Number(c.year),
-                crop: treatObj.crop || c.crop,
-                cycleId: treatObj.cycleId || c.id
+                year: Number(c.year),
+                crop: c.crop,
+                cycleId: c.id
             };
             if (isFirebaseConnected && db) {
                 db.collection('treatments').doc(normalized.id.toString()).set(normalized);
             } else {
-                const idx = treatmentData.findIndex(item => item.id === normalized.id);
-                if (idx >= 0) treatmentData[idx] = normalized;
-                else treatmentData.push(normalized);
-                localStorage.setItem('bc_treatments', JSON.stringify(treatmentData));
+                const idx = treatmentEntries.findIndex(item => item.id === normalized.id);
+                if (idx >= 0) treatmentEntries[idx] = normalized;
+                else treatmentEntries.push(normalized);
+                localStorage.setItem('bc_treatments', JSON.stringify(treatmentEntries));
                 renderTreatmentList();
             }
         }
@@ -1305,30 +1311,26 @@
             }
         }
 
-        function getActiveHarvestEntries() {
-            const c = getActiveCycle();
-            return harvestData.filter(h => {
-                if (h.cycleId) return String(h.cycleId) === String(c.id);
-                return Number(h.year || DEFAULT_CYCLE_YEAR) === Number(c.year) &&
-                       String(h.crop || DEFAULT_CYCLE_CROP) === String(c.crop);
-            });
-        }
-
         function saveHarvestToDb(harvestObj) {
             const c = getActiveCycle();
+            const activePonds = getActivePonds();
+            if (!activePonds.some(p => String(p.id) === String(harvestObj.pond))) {
+                alert(`Pond ${harvestObj.pond} is not available in ${c.year} • ${c.crop}.`);
+                return;
+            }
             const normalized = {
                 ...harvestObj,
-                year: harvestObj.year || Number(c.year),
-                crop: harvestObj.crop || c.crop,
-                cycleId: harvestObj.cycleId || c.id
+                year: Number(c.year),
+                crop: c.crop,
+                cycleId: c.id
             };
             if (isFirebaseConnected && db) {
                 db.collection('harvests').doc(normalized.id.toString()).set(normalized);
             } else {
-                const idx = harvestData.findIndex(item => item.id === normalized.id);
-                if (idx >= 0) harvestData[idx] = normalized;
-                else harvestData.push(normalized);
-                localStorage.setItem('bc_harvests', JSON.stringify(harvestData));
+                const idx = harvestEntries.findIndex(item => item.id === normalized.id);
+                if (idx >= 0) harvestEntries[idx] = normalized;
+                else harvestEntries.push(normalized);
+                localStorage.setItem('bc_harvests', JSON.stringify(harvestEntries));
                 renderHarvestList();
             }
         }
@@ -1377,8 +1379,10 @@
         }
 
         function getGrowthFromLastSample(targetSample) {
+            const targetCycle = targetSample.cycleId || `${Number(targetSample.year || DEFAULT_CYCLE_YEAR)}|${String(targetSample.crop || DEFAULT_CYCLE_CROP).toLowerCase()}`;
             const earlierSamples = samplingEntries
                 .filter(s => s.pond === targetSample.pond && s.id !== targetSample.id)
+                .filter(s => String(s.cycleId || `${Number(s.year || DEFAULT_CYCLE_YEAR)}|${String(s.crop || DEFAULT_CYCLE_CROP).toLowerCase()}`) === String(targetCycle))
                 .filter(s => {
                     const dateDiff = new Date(targetSample.date + 'T00:00:00') - new Date(s.date + 'T00:00:00');
                     if (dateDiff > 0) return true;
@@ -1402,8 +1406,10 @@
         }
 
         function getLatestCumulativeForPond(pondId, excludeSampleId = null) {
+            const c = getActiveCycle();
             const pondSamples = samplingEntries
                 .filter(s => s.pond === pondId && (excludeSampleId === null || s.id !== excludeSampleId))
+                .filter(s => String(s.cycleId || `${Number(s.year || DEFAULT_CYCLE_YEAR)}|${String(s.crop || DEFAULT_CYCLE_CROP).toLowerCase()}`) === String(c.id))
                 .sort((a, b) => new Date(b.date + 'T00:00:00') - new Date(a.date + 'T00:00:00') || b.id - a.id);
 
             if (pondSamples.length === 0) return 0;
@@ -1641,7 +1647,18 @@
             const formattedDate = formatDateDisplay(latestSystemDate);
 
             // Farm-level summary card — kept above the individual pond cards.
-            // Total Expense is intentionally a placeholder for the future laptop-app link.
+            // Total Expense is GLOBAL: vendor payments + ledger expenses, irrespective of Year/Crop.
+            const totalVendorPayments = vendorTransactions.reduce((acc, t) => {
+                const type = String(t.type || '').trim().toLowerCase();
+                return acc + (type === 'credit' ? (parseFloat(t.amount) || 0) : 0);
+            }, 0);
+            const totalLedgerExpenses = ledgerEntries.reduce((acc, e) => acc + (parseFloat(e.amount) || 0), 0);
+            const totalFarmExpense = totalVendorPayments + totalLedgerExpenses;
+            // Farm revenue is GLOBAL: include every harvest record across all Year/Crop cycles.
+            const totalFarmRevenue = harvestEntries.reduce((acc, h) => {
+                return acc + (parseFloat(h.finalValue) || 0);
+            }, 0);
+            const totalFarmProfitLoss = totalFarmRevenue - totalFarmExpense;
             const totalFarmFeed = getActiveFeedEntries().reduce((acc, curr) => {
                 return acc + (curr.fasting ? 0 : (parseFloat(curr.qty) || 0));
             }, 0);
@@ -1656,11 +1673,19 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
                         <span class="text-xs text-slate-500 block">Total Expense</span>
-                        <span id="farmTotalExpense" class="text-lg font-extrabold text-slate-800">₹ 0</span>
+                        <span id="farmTotalExpense" class="text-lg font-extrabold text-slate-800">₹ ${totalFarmExpense.toLocaleString('en-IN')}</span>
                     </div>
                     <div class="bg-blue-50 p-3 rounded-xl border border-blue-100">
                         <span class="text-xs text-slate-500 block">Total Feed</span>
                         <span id="farmTotalFeed" class="text-lg font-extrabold text-blue-600">${totalFarmFeed.toFixed(1)} kg</span>
+                    </div>
+                    <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-100">
+                        <span class="text-xs text-slate-500 block">Total Revenue</span>
+                        <span id="farmTotalRevenue" class="text-lg font-extrabold text-emerald-600">₹ ${totalFarmRevenue.toLocaleString('en-IN')}</span>
+                    </div>
+                    <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                        <span class="text-xs text-slate-500 block">Farm Profit / Loss</span>
+                        <span id="farmTotalProfitLoss" class="text-lg font-extrabold ${totalFarmProfitLoss >= 0 ? 'text-emerald-600' : 'text-red-600'}">₹ ${totalFarmProfitLoss.toLocaleString('en-IN')}</span>
                     </div>
                 </div>
             `;
@@ -1835,9 +1860,14 @@
             const totalCountEl = document.getElementById('totalSamplingCount');
             container.innerHTML = '';
 
+            const c = getActiveCycle();
+            const cycleEntries = samplingEntries.filter(item => {
+                const itemCycle = item.cycleId || `${Number(item.year || DEFAULT_CYCLE_YEAR)}|${String(item.crop || DEFAULT_CYCLE_CROP).toLowerCase()}`;
+                return String(itemCycle) === String(c.id);
+            });
             const filteredEntries = samplingPondFilter === 'ALL'
-                ? samplingEntries
-                : samplingEntries.filter(item => item.pond === samplingPondFilter);
+                ? cycleEntries
+                : cycleEntries.filter(item => item.pond === samplingPondFilter);
 
             if (totalCountEl) totalCountEl.innerText = `${filteredEntries.length} Records Logged`;
 
@@ -1872,7 +1902,7 @@
                 cardsContainer.className = 'space-y-2 pl-1';
 
                 entriesOnDate.forEach(item => {
-                    const pondObj = ponds.find(p => p.id === item.pond);
+                    const pondObj = getActivePonds().find(p => p.id === item.pond);
                     const doc = pondObj ? calculateDOC(pondObj.stockingDate, item.date) : '-';
                     const growthInfo = getGrowthFromLastSample(item);
 
@@ -1934,9 +1964,10 @@
             const totalCountEl = document.getElementById('totalTreatmentCount');
             container.innerHTML = '';
 
+            const activeEntries = getActiveTreatmentEntries();
             const filteredEntries = treatmentPondFilter === 'ALL'
-                ? treatmentEntries
-                : treatmentEntries.filter(item => item.pond === treatmentPondFilter);
+                ? activeEntries
+                : activeEntries.filter(item => item.pond === treatmentPondFilter);
 
             if (totalCountEl) totalCountEl.innerText = `${filteredEntries.length} Records Logged`;
 
@@ -2019,9 +2050,14 @@
             const totalCountEl = document.getElementById('totalHarvestCount');
             container.innerHTML = '';
 
+            const c = getActiveCycle();
+            const cycleEntries = harvestEntries.filter(item => {
+                const itemCycleId = item.cycleId || `${Number(item.year || DEFAULT_CYCLE_YEAR)}|${String(item.crop || DEFAULT_CYCLE_CROP).toLowerCase()}`;
+                return String(itemCycleId) === String(c.id);
+            });
             const filteredEntries = harvestPondFilter === 'ALL'
-                ? harvestEntries
-                : harvestEntries.filter(item => item.pond === harvestPondFilter);
+                ? cycleEntries
+                : cycleEntries.filter(item => item.pond === harvestPondFilter);
 
             if (totalCountEl) totalCountEl.innerText = `${filteredEntries.length} Records Logged`;
 
@@ -2152,7 +2188,8 @@
                 editingHarvestId = id;
                 modalTitle.innerText = "Edit Harvest Log";
                 submitBtn.innerText = "Update Harvest Log";
-                const h = harvestEntries.find(x => x.id === id);
+                const c = getActiveCycle();
+                const h = harvestEntries.find(x => x.id === id && String(x.cycleId || `${Number(x.year || DEFAULT_CYCLE_YEAR)}|${String(x.crop || DEFAULT_CYCLE_CROP).toLowerCase()}`) === String(c.id));
                 if (h) {
                     document.getElementById('harvestPond').value = h.pond;
                     document.getElementById('harvestDate').value = h.date;
@@ -2204,20 +2241,13 @@
             const finalValue = Math.round(biomass * price);
             const id = editingHarvestId !== null ? editingHarvestId : Date.now();
 
-                        const c = getActiveCycle();
-            const activePonds = getActivePonds();
-            const selectedHarvestPond = typeof pond !== 'undefined' ? pond : currentPond;
-            if (!selectedHarvestPond || !activePonds.some(p => p.id === selectedHarvestPond)) {
-                alert(`Please select a pond from ${c.year} • ${c.crop}.`);
-                return;
-            }
-
-const harvestObj = {
+            const c = getActiveCycle();
+            const harvestObj = {
+                id,
+                pond,
                 year: Number(c.year),
                 crop: c.crop,
                 cycleId: c.id,
-                id,
-                pond,
                 date,
                 type,
                 biomass,
@@ -2326,11 +2356,20 @@ const harvestObj = {
             }
 
             const abw = parseFloat((sampleWeight / count).toFixed(2));
+            const c = getActiveCycle();
+            const activePonds = getActivePonds();
+            if (!activePonds.some(p => p.id === pond)) {
+                alert(`Pond ${pond} does not belong to ${c.year} ${c.crop}.`);
+                return;
+            }
             const id = editingSampleId !== null ? editingSampleId : Date.now();
             const sampleObj = { 
                 id, 
                 date, 
-                pond, 
+                pond,
+                year: Number(c.year),
+                crop: c.crop,
+                cycleId: c.id, 
                 sampleWeight, 
                 count, 
                 abw, 
@@ -2361,8 +2400,14 @@ const harvestObj = {
             const purpose = document.getElementById('treatmentPurpose').value;
             const notes = document.getElementById('treatmentNotes').value.trim();
 
+            const c = getActiveCycle();
+            const activePonds = getActivePonds();
+            if (!activePonds.some(p => String(p.id) === String(pond))) {
+                alert(`Please select a pond from ${c.year} • ${c.crop}.`);
+                return;
+            }
             const id = editingTreatmentId !== null ? editingTreatmentId : Date.now();
-            const treatObj = { id, date, pond, category, product, qty, unit, purpose, notes };
+            const treatObj = { id, date, pond, category, product, qty, unit, purpose, notes, year: Number(c.year), crop: c.crop, cycleId: c.id };
 
             saveTreatmentToDb(treatObj);
             closeTreatmentModal();
@@ -2497,7 +2542,9 @@ const harvestObj = {
         }
 
         function exportHarvestCSV() {
-            const data = harvestPondFilter === 'ALL' ? harvestEntries : harvestEntries.filter(h => h.pond === harvestPondFilter);
+            const c = getActiveCycle();
+            const cycleData = harvestEntries.filter(h => String(h.cycleId || `${Number(h.year || DEFAULT_CYCLE_YEAR)}|${String(h.crop || DEFAULT_CYCLE_CROP).toLowerCase()}`) === String(c.id));
+            const data = harvestPondFilter === 'ALL' ? cycleData : cycleData.filter(h => h.pond === harvestPondFilter);
             if (!data.length) return alert("No harvest records to export.");
             const headers = ["Harvest ID", "Date", "Pond No", "Harvest Type", "Biomass (kg)", "Count (pcs/kg)", "ABW (gm)", "Price per kg", "Total Pieces", "Feed Consumed (kg)", "Final Value (Rs)", "DOC", "Notes"];
             const rows = data.map(h => {
@@ -2739,7 +2786,7 @@ const harvestObj = {
                 editingTreatmentId = id;
                 modalTitle.innerText = "Edit Treatment Entry";
                 submitBtn.innerText = "Update Treatment";
-                const treat = treatmentEntries.find(t => t.id === id);
+                const treat = getActiveTreatmentEntries().find(t => t.id === id);
                 if (treat) {
                     document.getElementById('treatmentDate').value = treat.date;
                     document.getElementById('treatmentPond').value = treat.pond;
@@ -2779,7 +2826,7 @@ const harvestObj = {
                 editingSampleId = id;
                 modalTitle.innerText = "Edit Sampling Entry";
                 submitBtn.innerText = "Update Sample";
-                const sample = samplingEntries.find(s => s.id === id);
+                const sample = samplingEntries.find(s => s.id === id && String(s.cycleId || `${Number(s.year || DEFAULT_CYCLE_YEAR)}|${String(s.crop || DEFAULT_CYCLE_CROP).toLowerCase()}`) === String(getActiveCycle().id));
                 if (sample) {
                     document.getElementById('samplingDate').value = sample.date;
                     document.getElementById('samplingPond').value = sample.pond;
