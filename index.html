@@ -91,6 +91,13 @@
     <meta name="apple-mobile-web-app-title" content="Farm Hub">
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="icon" type="image/png" href="icon.png">
+<style id="mobile-cycle-foundation-style">
+#headerCycleControls select{max-width:76px}
+</style>
+<style id="mobile-feed-cycle-note-style">#mobile-feed-cycle-note{display:inline-flex;align-items:center;margin:.4rem 0 .7rem;padding:.3rem .65rem;border:1px solid #dbeafe;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-size:.7rem;font-weight:700}</style>
+<style id="mobile-sampling-cycle-note-style">#mobile-sampling-cycle-note{display:inline-flex;align-items:center;margin:.4rem 0 .7rem;padding:.3rem .65rem;border:1px solid #dbeafe;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-size:.7rem;font-weight:700}</style>
+<style id="mobile-treatment-cycle-note-style">#mobile-treatment-cycle-note{display:inline-flex;align-items:center;margin:.4rem 0 .7rem;padding:.3rem .65rem;border:1px solid #dbeafe;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-size:.7rem;font-weight:700}</style>
+<style id="mobile-harvest-cycle-note-style">#mobile-harvest-cycle-note{display:inline-flex;align-items:center;margin:.4rem 0 .7rem;padding:.3rem .65rem;border:1px solid #dbeafe;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-size:.7rem;font-weight:700}</style>
 </head>
 <body class="bg-slate-50 font-sans h-screen flex flex-col overflow-hidden">
 
@@ -137,6 +144,16 @@
                                 </select>
                             </div>
                             <div id="headerHomeTitle" class="text-lg font-bold">Elite Aqualines</div>
+                            <div id="headerCycleControls" class="flex items-center gap-1.5 mt-1">
+                                <select id="mobileYearSelector" onchange="changeMobileCycleYear(this.value)"
+                                    class="bg-blue-700 text-white text-[11px] font-bold rounded-lg px-1.5 py-1 border border-blue-400/60 outline-none">
+                                </select>
+                                <select id="mobileCropSelector" onchange="changeMobileCycleCrop(this.value)"
+                                    class="bg-blue-700 text-white text-[11px] font-bold rounded-lg px-1.5 py-1 border border-blue-400/60 outline-none">
+                                    <option value="Crop 1">Crop 1</option>
+                                    <option value="Crop 2">Crop 2</option>
+                                </select>
+                            </div>
                             <p id="headerSubtitleDate" class="text-xs text-blue-100 pl-0.5 pt-0.5 font-medium"></p>
                         </div>
                     </div>
@@ -224,7 +241,7 @@
                     <span class="w-14 text-right pr-1">Action</span>
                 </div>
 
-                <div id="feedHistoryList" class="space-y-3"></div>
+                <div id="mobile-feed-cycle-note">Active cycle: <span id="mobile-feed-cycle-note-text" style="margin-left:4px;"></span></div><div id="feedHistoryList" class="space-y-3"></div>
             </div>
 
             <!-- 4. Sampling View -->
@@ -819,6 +836,8 @@
                     syncAppLayout();
                     setTimeout(syncAppLayout, 100);
                 });
+                ensureActiveMobileCycle();
+                populateMobileCycleSelectors();
                 if (!isSyncInitialized) {
                     isSyncInitialized = true;
                     initRealtimeSync();
@@ -844,6 +863,15 @@
             { id: 'P4', length: 120, breadth: 60, area: 7200, stockingDate: '2026-08-05', stockingCount: 200000 },
             { id: 'P5', length: 90, breadth: 50, area: 4500, stockingDate: '2026-08-10', stockingCount: 135000 }
         ];
+
+        // Legacy pond records are treated as 2026 Crop 1 until explicitly assigned.
+        ponds = ponds.map(p => ({
+            ...p,
+            year: p.year || 2026,
+            crop: p.crop || 'Crop 1',
+            cycleId: p.cycleId || `${Number(p.year || 2026)}|${String(p.crop || 'Crop 1').toLowerCase()}`
+        }));
+        localStorage.setItem('bc_ponds', JSON.stringify(ponds));
 
         let feedEntries = JSON.parse(localStorage.getItem('bc_feeds')) || [];
         let samplingEntries = JSON.parse(localStorage.getItem('bc_sampling')) || [];
@@ -905,6 +933,117 @@
 
         let currentPond = 'P2';
         let sortDirection = 'desc';
+
+        // Year + Crop is the foundational operational context.
+        const DEFAULT_CYCLE_YEAR = 2026;
+        const DEFAULT_CYCLE_CROP = 'Crop 1';
+        let farmCycles = JSON.parse(localStorage.getItem('bc_farmCycles')) || [
+            { id: '2026|crop 1', year: 2026, crop: 'Crop 1', name: '2026 Crop 1' }
+        ];
+        let activeMobileCycle = JSON.parse(localStorage.getItem('bc_activeCycle')) || {
+            id: '2026|crop 1', year: 2026, crop: 'Crop 1'
+        };
+
+        function ensureActiveMobileCycle() {
+            if (!activeMobileCycle || !activeMobileCycle.year || !activeMobileCycle.crop) {
+                activeMobileCycle = { id: `${DEFAULT_CYCLE_YEAR}|crop 1`, year: DEFAULT_CYCLE_YEAR, crop: DEFAULT_CYCLE_CROP };
+            }
+            activeMobileCycle.id = `${Number(activeMobileCycle.year)}|${String(activeMobileCycle.crop).toLowerCase()}`;
+            if (!farmCycles.some(c => String(c.id) === String(activeMobileCycle.id))) {
+                farmCycles.push({
+                    id: activeMobileCycle.id,
+                    year: Number(activeMobileCycle.year),
+                    crop: activeMobileCycle.crop,
+                    name: `${activeMobileCycle.year} ${activeMobileCycle.crop}`
+                });
+            }
+            localStorage.setItem('bc_farmCycles', JSON.stringify(farmCycles));
+            localStorage.setItem('bc_activeCycle', JSON.stringify(activeMobileCycle));
+        }
+
+        function getActiveCycle() {
+            ensureActiveMobileCycle();
+            return activeMobileCycle;
+        }
+
+        function getActivePonds() {
+            const c = getActiveCycle();
+            return ponds.filter(p => {
+                if (p.cycleId) return String(p.cycleId) === String(c.id);
+                return Number(p.year || DEFAULT_CYCLE_YEAR) === Number(c.year) &&
+                       String(p.crop || DEFAULT_CYCLE_CROP) === String(c.crop);
+            });
+        }
+
+        function populateMobileCycleSelectors() {
+            const yearEl = document.getElementById('mobileYearSelector');
+            const cropEl = document.getElementById('mobileCropSelector');
+            if (!yearEl || !cropEl) return;
+            ensureActiveMobileCycle();
+
+            const years = [...new Set(farmCycles.map(c => Number(c.year)).filter(Boolean))].sort((a,b) => b-a);
+            yearEl.innerHTML = years.map(y => `<option value="${y}">${y}</option>`).join('');
+            yearEl.value = String(activeMobileCycle.year);
+            cropEl.value = activeMobileCycle.crop;
+        }
+
+        function refreshForMobileCycleChange() {
+            const activePonds = getActivePonds();
+            if (!activePonds.some(p => p.id === currentPond)) {
+                currentPond = activePonds.length ? activePonds[0].id : '';
+            }
+            samplingPondFilter = 'ALL';
+            treatmentPondFilter = 'ALL';
+            harvestPondFilter = 'ALL';
+            populateMobileCycleSelectors();
+            const feedCycleNote = document.getElementById('mobile-feed-cycle-note-text');
+            const harvestCycleNote = document.getElementById('mobile-harvest-cycle-note-text');
+            if (harvestCycleNote) harvestCycleNote.textContent = `${activeMobileCycle.year} • ${activeMobileCycle.crop}`;
+            const treatmentCycleNote = document.getElementById('mobile-treatment-cycle-note-text');
+            if (treatmentCycleNote) treatmentCycleNote.textContent = `${activeMobileCycle.year} • ${activeMobileCycle.crop}`;
+            const samplingCycleNote = document.getElementById('mobile-sampling-cycle-note-text');
+            if (samplingCycleNote) samplingCycleNote.textContent = `${activeMobileCycle.year} • ${activeMobileCycle.crop}`;
+            if (feedCycleNote) feedCycleNote.textContent = `${activeMobileCycle.year} • ${activeMobileCycle.crop}`;
+            syncPondDropdown();
+            renderAllPondsSummary();
+            renderPondList();
+            renderHistory();
+            renderSamplingList();
+            renderTreatmentList();
+            renderHarvestList();
+            updateHeaderDate();
+        }
+
+        function changeMobileCycleYear(year) {
+            const y = Number(year);
+            const crop = activeMobileCycle.crop || DEFAULT_CYCLE_CROP;
+            const found = farmCycles.find(c => Number(c.year) === y && String(c.crop) === String(crop));
+            activeMobileCycle = found
+                ? { id: found.id, year: Number(found.year), crop: found.crop }
+                : { id: `${y}|${String(crop).toLowerCase()}`, year: y, crop };
+            if (!farmCycles.some(c => c.id === activeMobileCycle.id)) {
+                alert(`Year ${y} • ${crop} has not been created on the laptop yet.`);
+                populateMobileCycleSelectors();
+                return;
+            }
+            localStorage.setItem('bc_activeCycle', JSON.stringify(activeMobileCycle));
+            refreshForMobileCycleChange();
+        }
+
+        function changeMobileCycleCrop(crop) {
+            const year = Number(activeMobileCycle.year || DEFAULT_CYCLE_YEAR);
+            const found = farmCycles.find(c => Number(c.year) === year && String(c.crop) === String(crop));
+            activeMobileCycle = found
+                ? { id: found.id, year: year, crop: found.crop }
+                : { id: `${year}|${String(crop).toLowerCase()}`, year, crop };
+            if (!farmCycles.some(c => c.id === activeMobileCycle.id)) {
+                alert(`${year} • ${crop} has not been created on the laptop yet.`);
+                populateMobileCycleSelectors();
+                return;
+            }
+            localStorage.setItem('bc_activeCycle', JSON.stringify(activeMobileCycle));
+            refreshForMobileCycleChange();
+        }
         let editingPondId = null;
         let editingSampleId = null;
         let editingTreatmentId = null;
@@ -944,12 +1083,33 @@
                 statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Cloud Sync`;
             }
 
+            db.collection('farmCycles').onSnapshot(snap => {
+                if (!snap.empty) {
+                    farmCycles = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    localStorage.setItem('bc_farmCycles', JSON.stringify(farmCycles));
+                    ensureActiveMobileCycle();
+                    populateMobileCycleSelectors();
+                } else {
+                    ensureActiveMobileCycle();
+                    farmCycles.forEach(c => db.collection('farmCycles').doc(c.id).set(c));
+                }
+                syncPondDropdown();
+                renderPondList();
+                renderAllPondsSummary();
+            }, err => console.error("Farm cycles sync error:", err));
+
             db.collection('ponds').onSnapshot(snap => {
                 if (!snap.empty) {
-                    ponds = snap.docs.map(doc => doc.data());
+                    ponds = snap.docs.map(doc => ({
+                        ...doc.data(),
+                        firestoreId: doc.id,
+                        year: doc.data().year || DEFAULT_CYCLE_YEAR,
+                        crop: doc.data().crop || DEFAULT_CYCLE_CROP,
+                        cycleId: doc.data().cycleId || `${Number(doc.data().year || DEFAULT_CYCLE_YEAR)}|${String(doc.data().crop || DEFAULT_CYCLE_CROP).toLowerCase()}`
+                    }));
                     localStorage.setItem('bc_ponds', JSON.stringify(ponds));
                 } else if (ponds.length > 0) {
-                    ponds.forEach(p => db.collection('ponds').doc(p.id).set(p));
+                    ponds.forEach(p => savePondToDb(p));
                 }
                 syncPondDropdown();
                 renderPondList();
@@ -960,8 +1120,7 @@
                 feedEntries = snap.docs.map(doc => doc.data());
                 localStorage.setItem('bc_feeds', JSON.stringify(feedEntries));
                 recalculateCumulatives();
-                renderAllPondsSummary();
-                renderHistory();
+                refreshForMobileCycleChange();
             }, err => console.error("Feeds sync error:", err));
 
             db.collection('sampling').onSnapshot(snap => {
@@ -994,25 +1153,62 @@
         }
 
         function savePondToDb(pondObj) {
+            const c = getActiveCycle();
+            pondObj.year = pondObj.year || Number(c.year);
+            pondObj.crop = pondObj.crop || c.crop;
+            pondObj.cycleId = pondObj.cycleId || c.id;
+            const firestoreId = pondObj.firestoreId || `${pondObj.cycleId}__${pondObj.id}`;
+
             if (isFirebaseConnected && db) {
-                db.collection('ponds').doc(pondObj.id).set(pondObj);
+                db.collection('ponds').doc(firestoreId).set(pondObj);
             } else {
+                const idx = ponds.findIndex(p => p.id === pondObj.id && String(p.cycleId) === String(pondObj.cycleId));
+                if (idx >= 0) ponds[idx] = pondObj; else ponds.push(pondObj);
                 localStorage.setItem('bc_ponds', JSON.stringify(ponds));
+                syncPondDropdown();
+                renderPondList();
+                renderAllPondsSummary();
             }
         }
 
         function deletePondFromDb(pondId) {
+            const c = getActiveCycle();
+            const pond = ponds.find(p => p.id === pondId && String(p.cycleId) === String(c.id));
+            const firestoreId = pond?.firestoreId || `${c.id}__${pondId}`;
             if (isFirebaseConnected && db) {
-                db.collection('ponds').doc(pondId).delete();
+                db.collection('ponds').doc(firestoreId).delete();
             } else {
+                ponds = ponds.filter(p => !(p.id === pondId && String(p.cycleId) === String(c.id)));
                 localStorage.setItem('bc_ponds', JSON.stringify(ponds));
+                syncPondDropdown();
+                renderPondList();
+                renderAllPondsSummary();
             }
         }
 
+        function getActiveFeedEntries() {
+            const c = getActiveCycle();
+            return feedEntries.filter(e => {
+                if (e.cycleId) return String(e.cycleId) === String(c.id);
+                return Number(e.year || DEFAULT_CYCLE_YEAR) === Number(c.year) &&
+                       String(e.crop || DEFAULT_CYCLE_CROP) === String(c.crop);
+            });
+        }
+
         function saveFeedToDb(entryObj) {
+            const c = getActiveCycle();
+            const normalized = {
+                ...entryObj,
+                year: entryObj.year || Number(c.year),
+                crop: entryObj.crop || c.crop,
+                cycleId: entryObj.cycleId || c.id
+            };
             if (isFirebaseConnected && db) {
-                db.collection('feeds').doc(entryObj.id.toString()).set(entryObj);
+                db.collection('feeds').doc(normalized.id.toString()).set(normalized);
             } else {
+                const idx = feedEntries.findIndex(item => item.id === normalized.id);
+                if (idx >= 0) feedEntries[idx] = normalized;
+                else feedEntries.push(normalized);
                 localStorage.setItem('bc_feeds', JSON.stringify(feedEntries));
                 recalculateCumulatives();
                 renderAllPondsSummary();
@@ -1032,12 +1228,32 @@
             }
         }
 
+        function getActiveSamplingEntries() {
+            const c = getActiveCycle();
+            return samplingData.filter(s => {
+                if (s.cycleId) return String(s.cycleId) === String(c.id);
+                return Number(s.year || DEFAULT_CYCLE_YEAR) === Number(c.year) &&
+                       String(s.crop || DEFAULT_CYCLE_CROP) === String(c.crop);
+            });
+        }
+
         function saveSamplingToDb(sampleObj) {
+            const c = getActiveCycle();
+            const normalized = {
+                ...sampleObj,
+                year: sampleObj.year || Number(c.year),
+                crop: sampleObj.crop || c.crop,
+                cycleId: sampleObj.cycleId || c.id
+            };
             if (isFirebaseConnected && db) {
-                db.collection('sampling').doc(sampleObj.id.toString()).set(sampleObj);
+                db.collection('sampling').doc(normalized.id.toString()).set(normalized);
             } else {
-                localStorage.setItem('bc_sampling', JSON.stringify(samplingEntries));
+                const idx = samplingData.findIndex(item => item.id === normalized.id);
+                if (idx >= 0) samplingData[idx] = normalized;
+                else samplingData.push(normalized);
+                localStorage.setItem('bc_sampling', JSON.stringify(samplingData));
                 renderSamplingList();
+                updateSamplingPondDropdown();
             }
         }
 
@@ -1051,11 +1267,30 @@
             }
         }
 
+        function getActiveTreatmentEntries() {
+            const c = getActiveCycle();
+            return treatmentData.filter(x => {
+                if (x.cycleId) return String(x.cycleId) === String(c.id);
+                return Number(x.year || DEFAULT_CYCLE_YEAR) === Number(c.year) &&
+                       String(x.crop || DEFAULT_CYCLE_CROP) === String(c.crop);
+            });
+        }
+
         function saveTreatmentToDb(treatObj) {
+            const c = getActiveCycle();
+            const normalized = {
+                ...treatObj,
+                year: treatObj.year || Number(c.year),
+                crop: treatObj.crop || c.crop,
+                cycleId: treatObj.cycleId || c.id
+            };
             if (isFirebaseConnected && db) {
-                db.collection('treatments').doc(treatObj.id.toString()).set(treatObj);
+                db.collection('treatments').doc(normalized.id.toString()).set(normalized);
             } else {
-                localStorage.setItem('bc_treatments', JSON.stringify(treatmentEntries));
+                const idx = treatmentData.findIndex(item => item.id === normalized.id);
+                if (idx >= 0) treatmentData[idx] = normalized;
+                else treatmentData.push(normalized);
+                localStorage.setItem('bc_treatments', JSON.stringify(treatmentData));
                 renderTreatmentList();
             }
         }
@@ -1070,11 +1305,30 @@
             }
         }
 
+        function getActiveHarvestEntries() {
+            const c = getActiveCycle();
+            return harvestData.filter(h => {
+                if (h.cycleId) return String(h.cycleId) === String(c.id);
+                return Number(h.year || DEFAULT_CYCLE_YEAR) === Number(c.year) &&
+                       String(h.crop || DEFAULT_CYCLE_CROP) === String(c.crop);
+            });
+        }
+
         function saveHarvestToDb(harvestObj) {
+            const c = getActiveCycle();
+            const normalized = {
+                ...harvestObj,
+                year: harvestObj.year || Number(c.year),
+                crop: harvestObj.crop || c.crop,
+                cycleId: harvestObj.cycleId || c.id
+            };
             if (isFirebaseConnected && db) {
-                db.collection('harvests').doc(harvestObj.id.toString()).set(harvestObj);
+                db.collection('harvests').doc(normalized.id.toString()).set(normalized);
             } else {
-                localStorage.setItem('bc_harvests', JSON.stringify(harvestEntries));
+                const idx = harvestData.findIndex(item => item.id === normalized.id);
+                if (idx >= 0) harvestData[idx] = normalized;
+                else harvestData.push(normalized);
+                localStorage.setItem('bc_harvests', JSON.stringify(harvestData));
                 renderHarvestList();
             }
         }
@@ -1103,16 +1357,20 @@
         }
 
         function recalculateCumulatives() {
-            const allPondIds = new Set([...ponds.map(p => p.id), ...feedEntries.map(e => e.pond)]);
-            
-            allPondIds.forEach(pondId => {
-                let pondLogs = feedEntries.filter(item => item.pond === pondId);
+            const groups = new Map();
+            feedEntries.forEach(entry => {
+                const cycleKey = entry.cycleId ||
+                    `${Number(entry.year || DEFAULT_CYCLE_YEAR)}|${String(entry.crop || DEFAULT_CYCLE_CROP).toLowerCase()}`;
+                const key = `${cycleKey}__${entry.pond}`;
+                if (!groups.has(key)) groups.set(key, []);
+                groups.get(key).push(entry);
+            });
+
+            groups.forEach(pondLogs => {
                 pondLogs.sort((a, b) => getEntryTimestamp(a) - getEntryTimestamp(b));
-                
                 let runningTotal = 0;
                 pondLogs.forEach(entry => {
-                    const fedQty = entry.fasting ? 0 : (parseFloat(entry.qty) || 0);
-                    runningTotal += fedQty;
+                    runningTotal += entry.fasting ? 0 : (parseFloat(entry.qty) || 0);
                     entry.cumulative = runningTotal;
                 });
             });
@@ -1182,8 +1440,9 @@
         }
 
         function getSystemLatestDate() {
-            if (feedEntries.length > 0) {
-                const sortedAll = [...feedEntries].sort((a, b) => new Date(b.date) - new Date(a.date));
+            const activeFeeds = getActiveFeedEntries();
+            if (activeFeeds.length > 0) {
+                const sortedAll = [...activeFeeds].sort((a, b) => new Date(b.date) - new Date(a.date));
                 return sortedAll[0].date;
             }
             return new Date().toISOString().split('T')[0];
@@ -1218,7 +1477,9 @@
             if (treatmentFilterSelect) treatmentFilterSelect.innerHTML = '<option value="ALL">All Ponds</option>';
             if (harvestFilterSelect) harvestFilterSelect.innerHTML = '<option value="ALL">All Ponds</option>';
 
-            if (ponds.length === 0) {
+            const activePonds = getActivePonds();
+
+            if (activePonds.length === 0) {
                 const opt = document.createElement('option');
                 opt.value = '';
                 opt.innerText = 'No Ponds';
@@ -1226,12 +1487,12 @@
                 return;
             }
 
-            if (!ponds.some(p => p.id === currentPond)) currentPond = ponds[0].id;
-            if (samplingPondFilter !== 'ALL' && !ponds.some(p => p.id === samplingPondFilter)) samplingPondFilter = 'ALL';
-            if (treatmentPondFilter !== 'ALL' && !ponds.some(p => p.id === treatmentPondFilter)) treatmentPondFilter = 'ALL';
-            if (harvestPondFilter !== 'ALL' && !ponds.some(p => p.id === harvestPondFilter)) harvestPondFilter = 'ALL';
+            if (!activePonds.some(p => p.id === currentPond)) currentPond = activePonds[0].id;
+            if (samplingPondFilter !== 'ALL' && !activePonds.some(p => p.id === samplingPondFilter)) samplingPondFilter = 'ALL';
+            if (treatmentPondFilter !== 'ALL' && !activePonds.some(p => p.id === treatmentPondFilter)) treatmentPondFilter = 'ALL';
+            if (harvestPondFilter !== 'ALL' && !activePonds.some(p => p.id === harvestPondFilter)) harvestPondFilter = 'ALL';
 
-            ponds.forEach(p => {
+            activePonds.forEach(p => {
                 const opt = document.createElement('option');
                 opt.value = p.id;
                 opt.innerText = p.id;
@@ -1381,7 +1642,7 @@
 
             // Farm-level summary card — kept above the individual pond cards.
             // Total Expense is intentionally a placeholder for the future laptop-app link.
-            const totalFarmFeed = feedEntries.reduce((acc, curr) => {
+            const totalFarmFeed = getActiveFeedEntries().reduce((acc, curr) => {
                 return acc + (curr.fasting ? 0 : (parseFloat(curr.qty) || 0));
             }, 0);
 
@@ -1405,7 +1666,9 @@
             `;
             container.appendChild(farmSummaryCard);
 
-            if (ponds.length === 0) {
+            const activePonds = getActivePonds();
+
+            if (activePonds.length === 0) {
                 const emptyCard = document.createElement('div');
                 emptyCard.className = 'bg-white p-6 rounded-2xl border border-slate-100 text-center text-slate-400 text-sm';
                 emptyCard.innerText = 'No ponds active.';
@@ -1414,9 +1677,9 @@
                 return;
             }
 
-            ponds.forEach(pond => {
+            activePonds.forEach(pond => {
                 const pondId = pond.id;
-                const pondEntries = feedEntries.filter(item => item.pond === pondId);
+                const pondEntries = getActiveFeedEntries().filter(item => item.pond === pondId);
                 
                 let tillTodayTotal = pondEntries.reduce((acc, curr) => acc + (curr.fasting ? 0 : (parseFloat(curr.qty) || 0)), 0);
                 let latestDateTotal = pondEntries
@@ -1459,7 +1722,8 @@
 
             const latestSystemDate = getSystemLatestDate();
 
-            ponds.forEach(p => {
+            const activePonds = getActivePonds();
+            activePonds.forEach(p => {
                 const doc = calculateDOC(p.stockingDate, latestSystemDate);
                 const card = document.createElement('div');
                 card.className = 'bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-2.5';
@@ -1496,7 +1760,7 @@
             const container = document.getElementById('feedHistoryList');
             container.innerHTML = '';
 
-            let pondEntries = feedEntries.filter(item => item.pond === currentPond);
+            let pondEntries = getActiveFeedEntries().filter(item => item.pond === currentPond);
             pondEntries.sort((a, b) => {
                 let dtA = getEntryTimestamp(a);
                 let dtB = getEntryTimestamp(b);
@@ -1871,7 +2135,7 @@
 
         function onHarvestPondChange(pondId) {
             if (editingHarvestId === null) {
-                const pondFeed = feedEntries
+                const pondFeed = getActiveFeedEntries()
                     .filter(e => e.pond === pondId)
                     .reduce((acc, curr) => acc + (curr.fasting ? 0 : (parseFloat(curr.qty) || 0)), 0);
                 document.getElementById('harvestFeedConsumed').value = pondFeed > 0 ? pondFeed.toFixed(1) : '';
@@ -1940,7 +2204,18 @@
             const finalValue = Math.round(biomass * price);
             const id = editingHarvestId !== null ? editingHarvestId : Date.now();
 
-            const harvestObj = {
+                        const c = getActiveCycle();
+            const activePonds = getActivePonds();
+            const selectedHarvestPond = typeof pond !== 'undefined' ? pond : currentPond;
+            if (!selectedHarvestPond || !activePonds.some(p => p.id === selectedHarvestPond)) {
+                alert(`Please select a pond from ${c.year} • ${c.crop}.`);
+                return;
+            }
+
+const harvestObj = {
+                year: Number(c.year),
+                crop: c.crop,
+                cycleId: c.id,
                 id,
                 pond,
                 date,
@@ -1998,10 +2273,22 @@
                 }
             }
 
+            const c = getActiveCycle();
+            const activePonds = getActivePonds();
+            if (!currentPond || !activePonds.some(p => p.id === currentPond)) {
+                alert(`Please select a pond from ${c.year} • ${c.crop}.`);
+                return;
+            }
+
             const id = editingEntryId !== null ? editingEntryId : Date.now();
+            const existing = editingEntryId !== null ? feedEntries.find(e => e.id === editingEntryId) : null;
             const entryObj = {
+                ...(existing || {}),
                 id,
                 pond: currentPond,
+                year: Number(c.year),
+                crop: c.crop,
+                cycleId: c.id,
                 date,
                 time,
                 qty: totalQty,
@@ -2096,12 +2383,29 @@
             const stockingDate = document.getElementById('pondStockingDate').value;
             const stockingCount = parseInt(document.getElementById('pondStockingCount').value, 10) || 0;
 
-            if (editingPondId !== null && name !== editingPondId && ponds.some(p => p.id === name)) {
-                alert(`Pond ${name} already exists.`);
+            const c = getActiveCycle();
+            const activePonds = getActivePonds();
+
+            if (editingPondId !== null && name !== editingPondId && activePonds.some(p => p.id === name)) {
+                alert(`Pond ${name} already exists in ${c.year} ${c.crop}.`);
+                return;
+            }
+            if (editingPondId === null && activePonds.some(p => p.id === name)) {
+                alert(`Pond ${name} already exists in ${c.year} ${c.crop}.`);
                 return;
             }
 
-            const pondObj = { id: name, length, breadth, area, stockingDate, stockingCount };
+            const existing = editingPondId !== null
+                ? ponds.find(p => p.id === editingPondId && String(p.cycleId) === String(c.id))
+                : null;
+            const pondObj = {
+                ...(existing || {}),
+                id: name,
+                length, breadth, area, stockingDate, stockingCount,
+                year: Number(c.year),
+                crop: c.crop,
+                cycleId: c.id
+            };
             
             if (editingPondId !== null && name !== editingPondId) {
                 deletePondFromDb(editingPondId);
@@ -2137,10 +2441,11 @@
         }
 
         function exportFeedCSV() {
-            if (feedEntries.length === 0) return alert("No feed records to export.");
+            const activeFeeds = getActiveFeedEntries();
+            if (activeFeeds.length === 0) return alert("No feed records to export for the active Year + Crop.");
             const headers = ["Entry ID", "Pond", "Date", "Time", "Fasting", "Feed Code", "Feed Qty (kg)", "Supplement Name", "Total Qty (gm)", "Cumulative Total (kg)", "Notes"];
             const rows = [];
-            feedEntries.forEach(e => {
+            activeFeeds.forEach(e => {
                 const sName = e.supplement?.code || "";
                 const sQty = e.supplement?.qty ? parseFloat(e.supplement.qty).toFixed(2) : "";
                 const cum = (parseFloat(e.cumulative) || 0).toFixed(1);
@@ -2562,7 +2867,7 @@
             if (id !== null) {
                 editingEntryId = id;
                 modalTitle.innerText = `Edit Feed Data (${currentPond})`;
-                const entry = feedEntries.find(e => e.id === id);
+                const entry = getActiveFeedEntries().find(e => e.id === id);
                 if (entry) {
                     document.getElementById('feedingDate').value = entry.date;
                     const parts = entry.time.split(' ');
