@@ -95,6 +95,136 @@
 #headerCycleControls select{max-width:76px}
 </style>
 <style id="mobile-feed-cycle-note-style">#mobile-feed-cycle-note{display:inline-flex;align-items:center;margin:.4rem 0 .7rem;padding:.3rem .65rem;border:1px solid #dbeafe;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-size:.7rem;font-weight:700}</style>
+
+<style id="bluecrest-base-design-mobile">
+/* =========================================================
+   BLUECREST MOBILE BASE DESIGN
+   Visual language matched to Vendor Master + Pond-wise P&L
+   ========================================================= */
+:root{
+  --bc-navy:#0f2742;
+  --bc-navy-2:#123d62;
+  --bc-teal:#176b67;
+  --bc-sky:#7dd3fc;
+  --bc-mint:#6ee7b7;
+  --bc-bg:#f2f4f1;
+  --bc-card:#ffffff;
+  --bc-border:#dbe5ef;
+  --bc-text:#0f2742;
+  --bc-muted:#718096;
+  --bc-shadow:0 7px 24px rgba(15,23,42,.055);
+}
+html,body{background:var(--bc-bg)!important;color:var(--bc-text);}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif!important;}
+
+/* Top identity/header becomes the mobile equivalent of the premium hero. */
+.app-fixed-header{background:var(--bc-bg)!important;box-shadow:0 6px 20px rgba(15,35,64,.10)!important;}
+.app-fixed-header > div:first-child{
+  background:linear-gradient(135deg,var(--bc-navy) 0%,var(--bc-navy-2) 58%,var(--bc-teal) 100%)!important;
+  box-shadow:0 12px 30px rgba(15,39,66,.14)!important;
+  position:relative;overflow:hidden;
+}
+.app-fixed-header > div:first-child:after{
+  content:"";position:absolute;width:190px;height:190px;border-radius:50%;right:-65px;top:-100px;
+  background:rgba(255,255,255,.08);box-shadow:-65px 95px 0 rgba(255,255,255,.035);pointer-events:none;
+}
+.app-fixed-header > div:first-child > div{position:relative;z-index:1;}
+#headerHomeTitle{font-weight:900!important;letter-spacing:-.02em;}
+#headerSubtitleDate{color:#c9d9e7!important;}
+#syncStatusBadge{background:rgba(255,255,255,.09)!important;border-color:rgba(255,255,255,.16)!important;color:#dbeafe!important;backdrop-filter:blur(8px);}
+#pondSelector,#mobileYearSelector,#mobileCropSelector{background:rgba(255,255,255,.10)!important;border-color:rgba(255,255,255,.18)!important;color:#fff!important;}
+
+/* Navigation tabs */
+.app-fixed-header > div:nth-child(2){background:#fff!important;border-color:var(--bc-border)!important;}
+.app-fixed-header > div:nth-child(2) > div{gap:.1rem;}
+.app-fixed-header button[id^="tab"]{color:#718096;transition:.18s ease;border-color:transparent!important;font-weight:750;}
+.app-fixed-header button[id^="tab"].text-blue-600{color:#0f5e8c!important;border-color:#6ee7b7!important;}
+
+/* Scroll surface */
+.app-scroll-content{background:var(--bc-bg);}
+
+/* Reusable white cards become consistent with laptop */
+#homeView .bg-white,
+#pondView .bg-white,
+#feedView .bg-white,
+#samplingView .bg-white,
+#treatmentView .bg-white,
+#harvestView .bg-white{
+  border-color:var(--bc-border)!important;
+  box-shadow:var(--bc-shadow)!important;
+}
+
+/* Main section headers: premium hero treatment */
+#pondView > .flex.justify-between.items-center,
+#feedView > .flex.justify-between.items-center,
+#samplingView > .flex.justify-between.items-center,
+#treatmentView > .flex.justify-between.items-center,
+#harvestView > .flex.justify-between.items-center{
+  background:linear-gradient(135deg,var(--bc-navy) 0%,var(--bc-navy-2) 58%,var(--bc-teal) 100%)!important;
+  color:#fff!important;
+  border:1px solid rgba(255,255,255,.08)!important;
+  border-radius:18px!important;
+  padding:1rem!important;
+  box-shadow:0 12px 30px rgba(15,39,66,.14)!important;
+  position:relative;overflow:hidden;
+}
+#pondView > .flex.justify-between.items-center:after,
+#feedView > .flex.justify-between.items-center:after,
+#samplingView > .flex.justify-between.items-center:after,
+#treatmentView > .flex.justify-between.items-center:after,
+#harvestView > .flex.justify-between.items-center:after{
+  content:"";position:absolute;width:130px;height:130px;border-radius:50%;right:-45px;top:-70px;background:rgba(255,255,255,.07);pointer-events:none;
+}
+#pondView > .flex.justify-between.items-center > div,
+#feedView > .flex.justify-between.items-center > div,
+#samplingView > .flex.justify-between.items-center > div,
+#treatmentView > .flex.justify-between.items-center > div,
+#harvestView > .flex.justify-between.items-center > div{position:relative;z-index:1;}
+#pondView h3,#feedView h3,#samplingView h3,#treatmentView h3,#harvestView h3{color:#fff!important;letter-spacing:.08em!important;}
+#pondView p,#feedView p,#samplingView p,#treatmentView p,#harvestView p{color:#c9d9e7!important;}
+#pondView > .flex.justify-between.items-center button,
+#feedView > .flex.justify-between.items-center button,
+#samplingView > .flex.justify-between.items-center button,
+#treatmentView > .flex.justify-between.items-center button,
+#harvestView > .flex.justify-between.items-center button{
+  background:rgba(255,255,255,.12)!important;border:1px solid rgba(255,255,255,.18)!important;color:#fff!important;backdrop-filter:blur(6px);position:relative;z-index:2;
+}
+
+/* Filter/action bars */
+#feedView > .flex.items-center,
+#samplingView > .flex.justify-between.items-center:not(:first-child),
+#treatmentView > .flex.justify-between.items-center:not(:first-child),
+#harvestView > .flex.justify-between.items-center:not(:first-child){
+  border-color:var(--bc-border)!important;background:#fff!important;box-shadow:var(--bc-shadow)!important;border-radius:14px!important;
+}
+
+/* Buttons and controls */
+button{transition:transform .12s ease,box-shadow .18s ease,background .18s ease;}
+button:active{transform:translateY(1px);}
+input,select,textarea{border-color:var(--bc-border)!important;}
+input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shadow:0 0 0 3px rgba(77,145,184,.12)!important;}
+
+/* Data cards */
+#pondCardsList > *,#feedHistoryList > *,#samplingCardsList > *,#treatmentCardsList > *,#harvestCardsList > *{
+  border-color:var(--bc-border)!important;box-shadow:var(--bc-shadow)!important;border-radius:16px!important;
+}
+
+/* Modals */
+.fixed.inset-0.bg-black\/60 > div,
+.fixed.inset-0.bg-slate-900\/60 > div{
+  border:1px solid var(--bc-border)!important;border-radius:20px!important;box-shadow:0 24px 70px rgba(15,23,42,.24)!important;
+}
+
+/* Loading/auth surfaces */
+#authLoadingScreen{background:var(--bc-bg)!important;}
+
+@media(max-width:420px){
+  .app-scroll-content{padding-left:.75rem!important;padding-right:.75rem!important;}
+  .app-fixed-header > div:first-child{padding:.75rem!important;}
+  .app-fixed-header button[id^="tab"]{font-size:.72rem!important;padding-left:.45rem!important;padding-right:.45rem!important;}
+}
+</style>
+
 </head>
 <body class="bg-slate-50 font-sans h-screen flex flex-col overflow-hidden">
 
@@ -382,8 +512,8 @@
                         <div>
                             <label class="block text-xs font-semibold text-slate-600 mb-1">Type *</label>
                             <select id="harvestType" required class="w-full border border-slate-200 p-2 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 bg-white text-xs font-bold">
-                                <option value="Partial Harvest">Partial Harvest</option>
-                                <option value="Final Harvest">Final Harvest</option>
+                                <option value="Partial">Partial</option>
+                                <option value="Full">Full</option>
                             </select>
                         </div>
                     </div>
@@ -1120,8 +1250,32 @@
 
             db.collection('sampling').onSnapshot(snap => {
                 samplingEntries = snap.docs.map(doc => {
-                    const d = doc.data();
-                    return { ...d, year: Number(d.year || DEFAULT_CYCLE_YEAR), crop: d.crop || DEFAULT_CYCLE_CROP, cycleId: d.cycleId || `${Number(d.year || DEFAULT_CYCLE_YEAR)}|${String(d.crop || DEFAULT_CYCLE_CROP).toLowerCase()}` };
+                    const d = doc.data() || {};
+                    const year = Number(d.year || d.cropYear || DEFAULT_CYCLE_YEAR);
+                    const crop = d.crop || d.cropCycle || DEFAULT_CYCLE_CROP;
+                    const cycleId = d.cycleId || `${year}|${String(crop).toLowerCase()}`;
+                    const pond = d.pond || d.pondId || d.pondName || '';
+                    const sampleWeight = Number(d.sampleWeight != null ? d.sampleWeight : (d.testWeight || 0));
+                    const prevCumulativeFeed = Number(d.prevCumulativeFeed != null ? d.prevCumulativeFeed : (d.lastFeed || 0));
+                    const currCumulativeFeed = d.currCumulativeFeed != null ? Number(d.currCumulativeFeed) : (d.currentFeed != null ? Number(d.currentFeed) : null);
+                    const netFeed = Number(d.netFeed != null ? d.netFeed : ((currCumulativeFeed != null ? currCumulativeFeed : 0) - prevCumulativeFeed));
+                    return {
+                        ...d,
+                        id: d.id != null ? d.id : doc.id,
+                        pond,
+                        pondId: d.pondId || pond,
+                        year, crop, cycleId,
+                        sampleWeight,
+                        testWeight: Number(d.testWeight != null ? d.testWeight : sampleWeight),
+                        count: Number(d.count || 0),
+                        abw: Number(d.abw != null ? d.abw : (sampleWeight > 0 && Number(d.count || 0) > 0 ? sampleWeight / Number(d.count) : 0)),
+                        prevCumulativeFeed,
+                        lastFeed: prevCumulativeFeed,
+                        currCumulativeFeed,
+                        currentFeed: currCumulativeFeed,
+                        netFeed,
+                        notes: d.notes || ''
+                    };
                 });
                 localStorage.setItem('bc_sampling', JSON.stringify(samplingEntries));
                 renderSamplingList();
@@ -1130,16 +1284,58 @@
             db.collection('treatments').onSnapshot(snap => {
                 treatmentEntries = snap.docs.map(doc => {
                     const d = doc.data() || {};
-                    const year = Number(d.year || DEFAULT_CYCLE_YEAR);
-                    const crop = d.crop || DEFAULT_CYCLE_CROP;
-                    return { ...d, year, crop, cycleId: d.cycleId || `${year}|${String(crop).toLowerCase()}` };
+                    const year = Number(d.year || d.cropYear || DEFAULT_CYCLE_YEAR);
+                    const crop = d.crop || d.cropCycle || DEFAULT_CYCLE_CROP;
+                    const cycleId = d.cycleId || `${year}|${String(crop).toLowerCase()}`;
+                    const pond = d.pond || d.pondId || d.pondName || '';
+                    const product = d.product || d.productName || '';
+                    return {
+                        ...d,
+                        id: d.id != null ? d.id : doc.id,
+                        pond,
+                        pondId: d.pondId || pond,
+                        product,
+                        productName: d.productName || product,
+                        purpose: d.purpose || '',
+                        year, crop, cycleId,
+                        qty: Number(d.qty != null ? d.qty : (d.quantity || 0)),
+                        unit: d.unit || 'Kg',
+                        notes: d.notes || ''
+                    };
                 });
                 localStorage.setItem('bc_treatments', JSON.stringify(treatmentEntries));
                 renderTreatmentList();
             }, err => console.error("Treatments sync error:", err));
 
             db.collection('harvests').onSnapshot(snap => {
-                harvestEntries = snap.docs.map(doc => doc.data());
+                harvestEntries = snap.docs.map(doc => {
+                    const d = doc.data() || {};
+                    const year = Number(d.year || d.cropYear || DEFAULT_CYCLE_YEAR);
+                    const crop = d.crop || d.cropCycle || DEFAULT_CYCLE_CROP;
+                    const cycleId = d.cycleId || `${year}|${String(crop).toLowerCase()}`;
+                    const pond = d.pond || d.pondId || d.pondName || '';
+                    const biomass = Number(d.biomass != null ? d.biomass : (d.biomassKg || d.weight || 0));
+                    const count = Number(d.count != null ? d.count : (d.piecesPerKg || 0));
+                    const price = Number(d.price != null ? d.price : (d.pricePerKg || 0));
+                    const totalPieces = Number(d.totalPieces != null ? d.totalPieces : (d.pieces || 0));
+                    const feedConsumed = Number(d.feedConsumed != null ? d.feedConsumed : (d.totalFeed || 0));
+                    const finalValue = Number(d.finalValue != null ? d.finalValue : (d.value != null ? d.value : (d.totalValue != null ? d.totalValue : biomass * price)));
+                    return {
+                        ...d,
+                        id: d.id != null ? d.id : doc.id,
+                        pond,
+                        pondId: d.pondId || pond,
+                        year, crop, cycleId,
+                        biomass, biomassKg: biomass, weight: biomass,
+                        count, price, pricePerKg: price,
+                        totalPieces, pieces: totalPieces,
+                        feedConsumed, totalFeed: feedConsumed,
+                        finalValue, value: finalValue, totalValue: finalValue,
+                        type: d.type || d.harvestType || 'Partial',
+                        date: d.date || d.harvestDate || new Date().toISOString().split('T')[0],
+                        notes: d.notes || ''
+                    };
+                });
                 localStorage.setItem('bc_harvests', JSON.stringify(harvestEntries));
                 renderHarvestList();
                 renderAllPondsSummary();
@@ -2094,7 +2290,7 @@
                 entriesOnDate.forEach(item => {
                     const pondObj = ponds.find(p => p.id === item.pond);
                     const doc = pondObj ? calculateDOC(pondObj.stockingDate, item.date) : '-';
-                    const isFinal = item.type === 'Final Harvest';
+                    const isFinal = item.type === 'Full';
 
                     const card = document.createElement('div');
                     card.className = `bg-white p-3.5 rounded-2xl border ${isLatestDate ? 'border-blue-200 ring-1 ring-blue-100' : 'border-slate-200'} shadow-xs space-y-2.5`;
@@ -2193,7 +2389,7 @@
                 if (h) {
                     document.getElementById('harvestPond').value = h.pond;
                     document.getElementById('harvestDate').value = h.date;
-                    document.getElementById('harvestType').value = h.type || 'Partial Harvest';
+                    document.getElementById('harvestType').value = h.type || 'Partial';
                     document.getElementById('harvestBiomass').value = h.biomass;
                     document.getElementById('harvestCount').value = h.count;
                     document.getElementById('harvestPrice').value = h.price;
@@ -2207,7 +2403,7 @@
                 submitBtn.innerText = "Save Harvest Log";
                 document.getElementById('harvestForm').reset();
                 document.getElementById('harvestDate').value = getSystemLatestDate();
-                document.getElementById('harvestType').value = 'Partial Harvest';
+                document.getElementById('harvestType').value = 'Partial';
                 
                 const selectedPond = currentPond || (ponds.length > 0 ? ponds[0].id : '');
                 if (ponds.length > 0) document.getElementById('harvestPond').value = selectedPond;
@@ -2703,7 +2899,7 @@
                         id: parseInt(r[0], 10) || Date.now() + i,
                         date: r[1],
                         pond: r[2],
-                        type: r[3] || 'Partial Harvest',
+                        type: r[3] || 'Partial',
                         biomass: parseFloat(r[4]) || 0,
                         count: parseFloat(r[5]) || 0,
                         abw: parseFloat(r[6]) || 0,
