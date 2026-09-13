@@ -241,7 +241,7 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                 🔒
             </div>
             <h2 class="text-lg font-black text-slate-800">Elite Aqualines</h2>
-            <p class="text-xs text-slate-500 mt-0.5 mb-5">Enter 6-digit PIN to activate this device</p>
+            <p class="text-xs text-slate-500 mt-0.5 mb-5">Enter Owner PIN or View-Only PIN</p>
             
             <input type="password" 
                    id="authPinInput" 
@@ -909,6 +909,9 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
         };
 
         const FIXED_USER_EMAIL = "jangidaquafarms@gmail.com";
+        // One shared read-only PIN for friends/viewers. Change this value if you want a different PIN.
+        const VIEW_ONLY_PIN = "123456";
+        let isViewOnlyMode = sessionStorage.getItem("bc_view_only_mode") === "1";
 
         let db = null;
         let isFirebaseConnected = false;
@@ -932,13 +935,53 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
         const authScreen = document.getElementById('pinAuthScreen');
         const mainApp = document.getElementById('mainAppContainer');
 
+        function enterViewOnlyMode() {
+            isViewOnlyMode = true;
+            sessionStorage.setItem("bc_view_only_mode", "1");
+            document.body.classList.add("view-only-mode");
+            authScreen.classList.add('hidden');
+            mainApp.classList.remove('hidden');
+            requestAnimationFrame(() => { syncAppLayout(); setTimeout(syncAppLayout, 100); });
+            ensureActiveMobileCycle();
+            populateMobileCycleSelectors();
+            if (!isSyncInitialized) {
+                isSyncInitialized = true;
+                initRealtimeSync();
+            }
+        }
+
+        function applyViewOnlyRestrictions() {
+            if (!isViewOnlyMode) return;
+            document.body.classList.add("view-only-mode");
+            document.querySelectorAll('form').forEach(form => {
+                form.addEventListener('submit', function(e) { e.preventDefault(); e.stopImmediatePropagation(); alert('View-Only mode: data changes are disabled.'); }, true);
+            });
+            document.querySelectorAll('button').forEach(btn => {
+                const text = (btn.innerText || btn.textContent || '').trim().toLowerCase();
+                const onclick = (btn.getAttribute('onclick') || '').toLowerCase();
+                if (/\b(add|save|delete|edit|update|submit|remove|mix second feed)\b/.test(text) || /\b(delete|save|submit|handleformsubmit|handlesamplingsubmit|handletreatmentsubmit|handleharvestsubmit|handlepondsubmit)\b/.test(onclick)) {
+                    btn.disabled = true;
+                    btn.style.display = 'none';
+                }
+            });
+        }
+
         pinInput.addEventListener('input', async () => {
             const pin = pinInput.value.trim();
             if (pin.length === 6) {
                 authStatus.textContent = "Verifying PIN...";
                 authStatus.className = "text-xs font-semibold mt-3 min-h-[18px] text-blue-600";
 
+                // Shared View-Only PIN does not expose the owner Firebase password.
+                if (pin === VIEW_ONLY_PIN) {
+                    pinInput.value = "";
+                    enterViewOnlyMode();
+                    return;
+                }
+
                 try {
+                    isViewOnlyMode = false;
+                    sessionStorage.removeItem("bc_view_only_mode");
                     await firebase.auth().signInWithEmailAndPassword(FIXED_USER_EMAIL, pin);
                     authStatus.textContent = "";
                     pinInput.value = "";
@@ -952,6 +995,11 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
 
         firebase.auth().onAuthStateChanged((user) => {
             authLoading.classList.add('hidden');
+
+            if (isViewOnlyMode) {
+                enterViewOnlyMode();
+                return;
+            }
 
             if (user) {
                 authScreen.classList.add('hidden');
@@ -977,8 +1025,15 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
         });
 
         function lockDevice() {
-            if (confirm("Lock this device? You will need your 6-digit PIN to re-enter.")) {
-                firebase.auth().signOut();
+            if (confirm("Lock this device? You will need your PIN to re-enter.")) {
+                if (isViewOnlyMode) {
+                    isViewOnlyMode = false;
+                    sessionStorage.removeItem("bc_view_only_mode");
+                    document.body.classList.remove("view-only-mode");
+                    location.reload();
+                } else {
+                    firebase.auth().signOut();
+                }
             }
         }
 
@@ -2417,6 +2472,7 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
         }
 
         function handleHarvestSubmit(e) {
+            if (isViewOnlyMode) { e.preventDefault(); alert('View-Only mode: data changes are disabled.'); return; }
             e.preventDefault();
             const pond = document.getElementById('harvestPond').value;
             const date = document.getElementById('harvestDate').value;
@@ -2461,12 +2517,14 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
         }
 
         function deleteHarvest(id) {
+            if (isViewOnlyMode) { alert('View-Only mode: data changes are disabled.'); return; }
             if (confirm("Delete this harvest record?")) {
                 deleteHarvestFromDb(id);
             }
         }
 
         function handleFormSubmit(e) {
+            if (isViewOnlyMode) { e.preventDefault(); alert('View-Only mode: data changes are disabled.'); return; }
             e.preventDefault();
             const date = document.getElementById('feedingDate').value;
             const time = document.getElementById('selectedTimeString').innerText;
@@ -2530,12 +2588,14 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
         }
 
         function deleteFeed(id) {
+            if (isViewOnlyMode) { alert('View-Only mode: data changes are disabled.'); return; }
             if (confirm("Delete this feed record? This will update cloud data on both phones.")) {
                 deleteFeedFromDb(id);
             }
         }
 
         function handleSamplingSubmit(e) {
+            if (isViewOnlyMode) { e.preventDefault(); alert('View-Only mode: data changes are disabled.'); return; }
             e.preventDefault();
             const date = document.getElementById('samplingDate').value;
             const pond = document.getElementById('samplingPond').value;
@@ -2580,12 +2640,14 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
         }
 
         function deleteSampling(id) {
+            if (isViewOnlyMode) { alert('View-Only mode: data changes are disabled.'); return; }
             if (confirm("Delete this sampling entry?")) {
                 deleteSamplingFromDb(id);
             }
         }
 
         function handleTreatmentSubmit(e) {
+            if (isViewOnlyMode) { e.preventDefault(); alert('View-Only mode: data changes are disabled.'); return; }
             e.preventDefault();
             const date = document.getElementById('treatmentDate').value;
             const pond = document.getElementById('treatmentPond').value;
@@ -2610,12 +2672,14 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
         }
 
         function deleteTreatment(id) {
+            if (isViewOnlyMode) { alert('View-Only mode: data changes are disabled.'); return; }
             if (confirm("Delete this treatment record?")) {
                 deleteTreatmentFromDb(id);
             }
         }
 
         function handlePondSubmit(e) {
+            if (isViewOnlyMode) { e.preventDefault(); alert('View-Only mode: data changes are disabled.'); return; }
             e.preventDefault();
             const name = document.getElementById('newPondName').value.trim().toUpperCase();
             const length = parseFloat(document.getElementById('pondLength').value) || 0;
@@ -2657,6 +2721,7 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
         }
 
         function deletePond(pondId) {
+            if (isViewOnlyMode) { alert('View-Only mode: data changes are disabled.'); return; }
             if (confirm(`Delete ${pondId}? This will remove it from both devices.`)) {
                 deletePondFromDb(pondId);
             }
@@ -3383,6 +3448,7 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
             }
         });
         document.addEventListener('DOMContentLoaded', () => {
+            applyViewOnlyRestrictions();
             syncAppLayout();
             setTimeout(syncAppLayout, 100);
             setTimeout(syncAppLayout, 500);
