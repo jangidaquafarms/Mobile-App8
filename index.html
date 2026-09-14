@@ -1952,6 +1952,12 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
         window.addEventListener('orientationchange', () => setTimeout(syncAppLayout, 250));
 
         function switchTab(tab) {
+            const scrollContent = document.querySelector('.app-scroll-content');
+            // Every tab must open from its own top position. Without resetting the
+            // shared scroll container, iOS Safari can retain the previous tab's
+            // scrollTop and place the new tab header underneath the fixed nav.
+            if (scrollContent) scrollContent.scrollTop = 0;
+
             const tabs = ['home', 'pond', 'feed', 'sampling', 'treatment', 'harvest'];
             const bottomBar = document.getElementById('bottomActionBar');
             const headerPondSection = document.getElementById('headerPondSection');
@@ -1994,7 +2000,11 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
             // the true bottom of the header on every tab.
             requestAnimationFrame(() => {
                 syncAppLayout();
-                setTimeout(syncAppLayout, 50);
+                if (scrollContent) scrollContent.scrollTop = 0;
+                setTimeout(() => {
+                    syncAppLayout();
+                    if (scrollContent) scrollContent.scrollTop = 0;
+                }, 50);
             });
         }
 
