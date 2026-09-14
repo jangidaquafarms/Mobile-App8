@@ -344,7 +344,7 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                         <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wide">Feed Tracking</h3>
                         <p class="text-xs text-slate-400" id="currentFeedPondDisplay">Current: Pond P2</p>
                     </div>
-                    <button onclick="openModal()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-sm transition flex items-center gap-1.5">
+                    <button id="feedRecordBtn" onclick="blueCrestOpenFeedRecord()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-sm transition flex items-center gap-1.5">
                         <span>+</span> Record Feed
                     </button>
                 </div>
@@ -385,7 +385,7 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                         <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wide">Biomass & Sampling</h3>
                         <p class="text-xs text-slate-400" id="totalSamplingCount">0 Records Logged</p>
                     </div>
-                    <button onclick="openSamplingModal()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-sm transition flex items-center gap-1.5">
+                    <button id="samplingRecordBtn" onclick="blueCrestOpenSamplingRecord()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-sm transition flex items-center gap-1.5">
                         <span>+</span> Add Sample
                     </button>
                 </div>
@@ -420,7 +420,7 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                         <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wide">Pond Treatments</h3>
                         <p class="text-xs text-slate-400" id="totalTreatmentCount">0 Records Logged</p>
                     </div>
-                    <button onclick="openTreatmentModal()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-sm transition flex items-center gap-1.5">
+                    <button id="treatmentRecordBtn" onclick="blueCrestOpenTreatmentRecord()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-sm transition flex items-center gap-1.5">
                         <span>+</span> Add Treatment
                     </button>
                 </div>
@@ -455,7 +455,7 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                         <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wide">Harvest Logs</h3>
                         <p class="text-xs text-slate-400" id="totalHarvestCount">0 Records Logged</p>
                     </div>
-                    <button onclick="openHarvestModal()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-sm transition flex items-center gap-1.5">
+                    <button id="harvestRecordBtn" onclick="blueCrestOpenHarvestRecord()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-sm transition flex items-center gap-1.5">
                         <span>+</span> Record Harvest
                     </button>
                 </div>
@@ -2144,16 +2144,19 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
         function changeSamplingPondFilter(v) {
             samplingPondFilter = v;
             renderSamplingList();
+            if (typeof refreshMobileRecordButtons === 'function') setTimeout(refreshMobileRecordButtons, 0);
         }
 
         function changeTreatmentPondFilter(v) {
             treatmentPondFilter = v;
             renderTreatmentList();
+            if (typeof refreshMobileRecordButtons === 'function') setTimeout(refreshMobileRecordButtons, 0);
         }
 
         function changeHarvestPondFilter(v) {
             harvestPondFilter = v;
             renderHarvestList();
+            if (typeof refreshMobileRecordButtons === 'function') setTimeout(refreshMobileRecordButtons, 0);
         }
 
         function toggleSortOrder() {
@@ -4043,26 +4046,76 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
     if(DEVICE!=='mobile') return;
     const c=activeC();
     const cropBlocked=isCropClosed(c.id);
-    const feedBtn=document.querySelector('#feedView button[onclick="openModal()"]');
+    const feedBtn=document.getElementById('feedRecordBtn');
     if(feedBtn) styleRecordButton(feedBtn,recordButtonState(typeof currentPond!=='undefined'?currentPond:''));
-    const sampleBtn=document.querySelector('#samplingView button[onclick="openSamplingModal()"]');
+    const sampleBtn=document.getElementById('samplingRecordBtn');
     if(sampleBtn){
       const filter=document.getElementById('samplingPondFilterSelect')?.value||'ALL';
-      styleRecordButton(sampleBtn,recordButtonState(filter==='ALL'?'':filter));
+      const pid=filter==='ALL'?(typeof currentPond!=='undefined'?currentPond:''):filter;
+      styleRecordButton(sampleBtn,recordButtonState(pid));
     }
-    const treatBtn=document.querySelector('#treatmentView button[onclick="openTreatmentModal()"]');
+    const treatBtn=document.getElementById('treatmentRecordBtn');
     if(treatBtn){
       const filter=document.getElementById('treatmentPondFilterSelect')?.value||'ALL';
-      styleRecordButton(treatBtn,recordButtonState(filter==='ALL'?'':filter));
+      const pid=filter==='ALL'?(typeof currentPond!=='undefined'?currentPond:''):filter;
+      styleRecordButton(treatBtn,recordButtonState(pid));
     }
-    const harvestBtn=document.querySelector('#harvestView button[onclick="openHarvestModal()"]');
+    const harvestBtn=document.getElementById('harvestRecordBtn');
     if(harvestBtn){
       const filter=document.getElementById('harvestPondFilterSelect')?.value||'ALL';
-      styleRecordButton(harvestBtn,recordButtonState(filter==='ALL'?'':filter));
+      const pid=filter==='ALL'?(typeof currentPond!=='undefined'?currentPond:''):filter;
+      styleRecordButton(harvestBtn,recordButtonState(pid));
     }
     const pondBtn=document.querySelector('#pondView button[onclick="openPondModal()"]');
     if(pondBtn) styleRecordButton(pondBtn,{blocked:cropBlocked,msg:`🔒 Crop Closed\n\n${c.year} • ${c.crop} is closed. Pond setup changes are locked until the crop is reactivated from the laptop.`});
   }
+
+  // Definitive entry-point protection: the modal cannot even open for a locked pond/crop.
+  // The existing save guards remain in place as the final safety layer.
+  // Pond Management is special: creating a NEW pond remains allowed while the crop is open,
+  // but editing/deleting an already closed pond is blocked at the function entry point.
+  const originalOpenPondModal = (typeof openPondModal === 'function') ? openPondModal : null;
+  if(originalOpenPondModal && !window.__bcPondModalLockWrapped){
+    window.__bcPondModalLockWrapped = true;
+    window.openPondModal = function(pondId = null){
+      const c = activeC();
+      if(pondId !== null && pondId !== undefined && String(pondId).trim() !== ''){
+        if(!window.blueCrestAssertOperationalWrite({pondId:String(pondId),cycleId:c.id})) return;
+      } else if(isCropClosed(c.id)){
+        alert(`🔒 Crop Closed\n\n${c.year} • ${c.crop} is closed. New pond creation is locked until the crop is reactivated from the laptop.`);
+        return;
+      }
+      return originalOpenPondModal.apply(this, arguments);
+    };
+  }
+  function blueCrestEntryGuard(pondId){
+    const state=recordButtonState(pondId);
+    if(state.blocked){ alert(state.msg); refreshMobileRecordButtons(); return false; }
+    return true;
+  }
+  window.blueCrestOpenFeedRecord=function(){
+    const pid=typeof currentPond!=='undefined'?currentPond:'';
+    if(!blueCrestEntryGuard(pid)) return;
+    return openModal();
+  };
+  window.blueCrestOpenSamplingRecord=function(){
+    const filter=document.getElementById('samplingPondFilterSelect')?.value||'ALL';
+    const pid=filter==='ALL'?(typeof currentPond!=='undefined'?currentPond:''):filter;
+    if(!blueCrestEntryGuard(pid)) return;
+    return openSamplingModal();
+  };
+  window.blueCrestOpenTreatmentRecord=function(){
+    const filter=document.getElementById('treatmentPondFilterSelect')?.value||'ALL';
+    const pid=filter==='ALL'?(typeof currentPond!=='undefined'?currentPond:''):filter;
+    if(!blueCrestEntryGuard(pid)) return;
+    return openTreatmentModal();
+  };
+  window.blueCrestOpenHarvestRecord=function(){
+    const filter=document.getElementById('harvestPondFilterSelect')?.value||'ALL';
+    const pid=filter==='ALL'?(typeof currentPond!=='undefined'?currentPond:''):filter;
+    if(!blueCrestEntryGuard(pid)) return;
+    return openHarvestModal();
+  };
   function installRecordButtonLockUI(){
     if(DEVICE!=='mobile'||window.__bcRecordButtonLockUIInstalled)return;
     window.__bcRecordButtonLockUIInstalled=true;
@@ -4096,6 +4149,11 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
       wrap('saveHarvestToDb',orig=>async function(obj){if(!window.blueCrestAssertOperationalWrite({pondId:obj?.pondId||obj?.pond,cycleId:cycleOf(obj)}))return;const r=await orig.apply(this,arguments);await autoCloseForHarvest(obj);return r;});
       ['deleteFeed','deleteSampling','deleteTreatment','deleteHarvest'].forEach(name=>wrap(name,orig=>function(id){const arr=name==='deleteFeed'?feedEntries:name==='deleteSampling'?samplingEntries:name==='deleteTreatment'?treatmentEntries:harvestEntries;const r=arr?.find(x=>String(x.id)===String(id)||String(x.firestoreId||'')===String(id)||String(x.legacyRecordId||'')===String(id));if(!window.blueCrestAssertOperationalWrite({pondId:pondIdOf(r),cycleId:cycleOf(r)}))return;return orig.apply(this,arguments);}));
     }
+    wrap('deletePond',orig=>function(id){
+      const p=getPond(id);
+      if(!window.blueCrestAssertOperationalWrite({pondId:id,cycleId:cycleOf(p)})) return;
+      return orig.apply(this,arguments);
+    });
     ['promptDeleteSample','promptDeleteTreatment','promptDeleteHarvest','promptDeleteFeedRecord','promptDeletePond'].forEach(name=>wrap(name,orig=>function(id){const arr=name.includes('Sample')?samples:name.includes('Treatment')?treatments:name.includes('Harvest')?harvests:name.includes('Feed')?feedEntries:name.includes('Pond')?ponds:name.includes('Purchase')?purchases:stockReturns;const r=name.includes('Pond')?getPond(id):arr?.find(x=>String(x.id)===String(id)||String(x.firestoreId||'')===String(id)||String(x.legacyRecordId||'')===String(id));if(!window.blueCrestAssertOperationalWrite({pondId:name.includes('Pond')?id:pondIdOf(r),cycleId:cycleOf(r)}))return;return orig.apply(this,arguments);}));
     ['editSample','editTreatment','editHarvest','editPond','editStockTransfer','editFeedRecord'].forEach(name=>wrap(name,orig=>function(id){const arr=name.includes('Sample')?samples:name.includes('Treatment')?treatments:name.includes('Harvest')?harvests:name.includes('Pond')?ponds:name.includes('Feed')?feedEntries:name.includes('StockTransfer')?stockTransfers:stockReturns;const r=name==='editPond'?getPond(id):arr?.find(x=>String(x.id)===String(id)||String(x.firestoreId||'')===String(id)||String(x.legacyRecordId||'')===String(id));if(!window.blueCrestAssertOperationalWrite({pondId:name==='editPond'?id:pondIdOf(r),cycleId:cycleOf(r)}))return;return orig.apply(this,arguments);}));
     if(DEVICE==='laptop'){
