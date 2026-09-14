@@ -2377,8 +2377,8 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                                 <span class="text-[11px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded">DOC ${doc}</span>
                             </div>
                             <div class="flex items-center gap-2">
-                                <button onclick="openSamplingModal(${item.id})" class="text-slate-500 hover:text-blue-600 transition">✏️</button>
-                                <button onclick="deleteSampling(${item.id})" class="text-slate-400 hover:text-rose-600 transition text-sm">🗑️</button>
+                                <button onclick=\'openSamplingModal(${JSON.stringify(String(item.id))})\' class="text-slate-500 hover:text-blue-600 transition">✏️</button>
+                                <button onclick=\'deleteSampling(${JSON.stringify(String(item.id))})\' class="text-slate-400 hover:text-rose-600 transition text-sm">🗑️</button>
                             </div>
                         </div>
                         <div class="grid grid-cols-4 gap-1.5 text-center">
@@ -2558,8 +2558,8 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                                 <span class="text-[11px] font-extrabold border px-2 py-0.5 rounded ${isFinal ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-amber-50 text-amber-700 border-amber-200'}">${item.type}</span>
                             </div>
                             <div class="flex items-center gap-2">
-                                <button onclick="openHarvestModal(${item.id})" class="text-slate-500 hover:text-blue-600 transition">✏️</button>
-                                <button onclick="deleteHarvest(${item.id})" class="text-slate-400 hover:text-rose-600 transition text-sm">🗑️</button>
+                                <button onclick=\'openHarvestModal(${JSON.stringify(String(item.id))})\' class="text-slate-500 hover:text-blue-600 transition">✏️</button>
+                                <button onclick=\'deleteHarvest(${JSON.stringify(String(item.id))})\' class="text-slate-400 hover:text-rose-600 transition text-sm">🗑️</button>
                             </div>
                         </div>
 
@@ -2641,7 +2641,14 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                 modalTitle.innerText = "Edit Harvest Log";
                 submitBtn.innerText = "Update Harvest Log";
                 const c = getActiveCycle();
-                const h = harvestEntries.find(x => x.id === id && String(x.cycleId || `${Number(x.year || DEFAULT_CYCLE_YEAR)}|${String(x.crop || DEFAULT_CYCLE_CROP).toLowerCase()}`) === String(c.id));
+                const h = harvestEntries.find(x =>
+                    (
+                        String(x.id) === String(id) ||
+                        String(x.firestoreId || '') === String(id) ||
+                        String(x.legacyRecordId || '') === String(id)
+                    ) &&
+                    String(x.cycleId || `${Number(x.year || DEFAULT_CYCLE_YEAR)}|${String(x.crop || DEFAULT_CYCLE_CROP).toLowerCase()}`) === String(c.id)
+                );
                 if (h) {
                     document.getElementById('harvestPond').value = h.pond;
                     document.getElementById('harvestDate').value = h.date;
@@ -3322,7 +3329,14 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                 editingSampleId = id;
                 modalTitle.innerText = "Edit Sampling Entry";
                 submitBtn.innerText = "Update Sample";
-                const sample = samplingEntries.find(s => s.id === id && String(s.cycleId || `${Number(s.year || DEFAULT_CYCLE_YEAR)}|${String(s.crop || DEFAULT_CYCLE_CROP).toLowerCase()}`) === String(getActiveCycle().id));
+                const sample = samplingEntries.find(s =>
+                    (
+                        String(s.id) === String(id) ||
+                        String(s.firestoreId || '') === String(id) ||
+                        String(s.legacyRecordId || '') === String(id)
+                    ) &&
+                    String(s.cycleId || `${Number(s.year || DEFAULT_CYCLE_YEAR)}|${String(s.crop || DEFAULT_CYCLE_CROP).toLowerCase()}`) === String(getActiveCycle().id)
+                );
                 if (sample) {
                     document.getElementById('samplingDate').value = sample.date;
                     document.getElementById('samplingPond').value = sample.pond;
