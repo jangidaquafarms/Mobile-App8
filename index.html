@@ -3841,3 +3841,205 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
     </script>
 </body>
 </html>
+
+<script id="bluecrest-lock-system">
+(function(){
+  const DEVICE = 'mobile';
+  let pondLocks = JSON.parse(localStorage.getItem('bc_pondLocks') || '{}');
+  let cropLocks = JSON.parse(localStorage.getItem('bc_cropLocks') || '{}');
+  const todayIso=()=>new Date().toISOString();
+  function cycleOf(r){
+    if(r?.cycleId) return String(r.cycleId);
+    if(typeof cycleIdFor==='function') return cycleIdFor(r?.year, r?.crop || r?.cropCycle);
+    if(typeof activeCycle!=='undefined') return String(activeCycle.id);
+    if(typeof activeMobileCycle!=='undefined') return String(activeMobileCycle.id);
+    return '';
+  }
+  function activeC(){
+    if(typeof activeCycle!=='undefined') return activeCycle;
+    if(typeof activeMobileCycle!=='undefined') return activeMobileCycle;
+    return {id:'2026|crop 1',year:2026,crop:'Crop 1'};
+  }
+  function pkey(c,p){ return `${String(c||'').trim()}__${String(p||'').trim()}`; }
+  function pondIdOf(r){ return String(r?.pondId || r?.pond || r?.pondName || '').trim(); }
+  function isPondClosed(pid,cid){ return !!pondLocks[pkey(cid,pid)]?.closed; }
+  function isCropClosed(cid){ return !!cropLocks[String(cid)]?.closed; }
+  function saveLocal(){ localStorage.setItem('bc_pondLocks',JSON.stringify(pondLocks)); localStorage.setItem('bc_cropLocks',JSON.stringify(cropLocks)); }
+  function deny(msg){ alert(msg); return false; }
+  window.blueCrestIsPondClosed=isPondClosed;
+  window.blueCrestIsCropClosed=isCropClosed;
+  window.blueCrestAssertOperationalWrite=function(opts){
+    const cid=String(opts?.cycleId || activeC().id || '');
+    if(isCropClosed(cid)) return deny(`🔒 Crop Closed\n\n${activeC().year} • ${activeC().crop} is closed. No new, edited, or deleted operational data can be entered until the crop is reactivated from the laptop.`);
+    const pid=String(opts?.pondId || '');
+    if(pid && isPondClosed(pid,cid)) return deny(`🔒 Pond Closed\n\n${opts?.pondName || pid} is closed after Full/Final Harvest. No new, edited, or deleted data can be entered until this pond is reactivated from the laptop.`);
+    return true;
+  };
+  function getPond(pid){ return (typeof ponds!=='undefined' && Array.isArray(ponds)?ponds:[]).find(p=>String(p.id)===String(pid)||String(p.name||'').toLowerCase()===String(pid).toLowerCase()); }
+  function relevantPonds(c){
+    const arr=typeof ponds!=='undefined'&&Array.isArray(ponds)?ponds:[];
+    return arr.filter(p=>{
+      const pc=String(p.cycleId || (typeof cycleIdFor==='function'?cycleIdFor(p.year||p.cropYear,p.crop||p.cropCycle):''));
+      const t=String(p.pondType||p.type||'').trim().toLowerCase();
+      return pc===String(c.id) && ['growout','grow-out','transferin','transfer-in'].includes(t);
+    });
+  }
+  function hasFullHarvest(p){
+    const arr=typeof harvests!=='undefined'&&Array.isArray(harvests)?harvests:(typeof harvestEntries!=='undefined'&&Array.isArray(harvestEntries)?harvestEntries:[]);
+    return arr.some(h=>cycleOf(h)===String(p.cycleId) && pondIdOf(h)===String(p.id) && ['full','final harvest'].includes(String(h.type||h.harvestType||'').trim().toLowerCase()));
+  }
+  async function cloudSet(col,id,data){ if(typeof db!=='undefined'&&db) await db.collection(col).doc(String(id)).set(data,{merge:true}); }
+  async function writeAudit(action,r,reason){
+    if(typeof db==='undefined'||!db) return;
+    await db.collection('lockAudit').doc(`${Date.now()}_${Math.random().toString(36).slice(2,8)}`).set({action,scope:r.pondId?'pond':'crop',cycleId:r.cycleId,year:Number(r.year),crop:r.crop,pondId:r.pondId||null,pondName:r.pondName||null,reason,device:DEVICE,timestamp:todayIso()});
+  }
+  async function closePond(p,reason){
+    const cid=String(p.cycleId || cycleOf(p)); const key=pkey(cid,p.id);
+    const rec={closed:true,cycleId:cid,year:Number(p.year||p.cropYear||activeC().year),crop:p.crop||p.cropCycle||activeC().crop,pondId:p.id,pondName:p.name||p.id,closedAt:todayIso(),closedBy:DEVICE,reason:reason||'Full/Final harvest recorded'};
+    pondLocks[key]=rec; saveLocal(); await cloudSet('pondLocks',key,rec);
+  }
+  async function closeCrop(c,reason){
+    const rec={closed:true,cycleId:String(c.id),year:Number(c.year),crop:c.crop,closedAt:todayIso(),closedBy:DEVICE,reason:reason||'All relevant ponds completed Full/Final Harvest'};
+    cropLocks[String(c.id)]=rec; saveLocal(); await cloudSet('cropLocks',String(c.id),rec);
+  }
+  async function autoCloseForHarvest(h){
+    const type=String(h?.type||h?.harvestType||'').trim().toLowerCase(); if(!['full','final harvest'].includes(type)) return;
+    const p=getPond(h.pondId||h.pond); if(!p) return;
+    const cid=String(h.cycleId || p.cycleId || cycleOf(p));
+    if(!isPondClosed(p.id,cid)) { await closePond({...p,cycleId:cid,crop:h.crop||p.crop,year:h.year||p.year},'Full/Final harvest recorded'); await writeAudit('POND_CLOSED',{cycleId:cid,year:h.year||p.year,crop:h.crop||p.crop,pondId:p.id,pondName:p.name},'Full/Final harvest recorded'); }
+    const c={id:cid,year:h.year||p.year||p.cropYear,crop:h.crop||p.crop||p.cropCycle};
+    const rel=relevantPonds(c);
+    if(rel.length && rel.every(x=>isPondClosed(x.id,cid)||hasFullHarvest(x)) && !isCropClosed(cid)){
+      for(const x of rel) if(!isPondClosed(x.id,cid)) await closePond(x,'Full/Final harvest recorded');
+      if(rel.every(x=>isPondClosed(x.id,cid))){ await closeCrop(c,'All relevant Grow-out/Transfer-in ponds completed Full/Final Harvest'); await writeAudit('CROP_CLOSED',c,'All relevant Grow-out/Transfer-in ponds completed Full/Final Harvest'); }
+    }
+    renderLockStatus();
+  }
+  async function reconcileExisting(){
+    const arr=typeof harvests!=='undefined'&&Array.isArray(harvests)?harvests:(typeof harvestEntries!=='undefined'&&Array.isArray(harvestEntries)?harvestEntries:[]);
+    for(const h of arr){ try{ await autoCloseForHarvest(h); }catch(e){ console.error('Lock reconciliation error:',e); } }
+  }
+  function renderLockStatus(){
+    const c=activeC(); if(!c) return;
+    let el=document.getElementById('bcLockStatusBar');
+    if(!el){
+      const anchor=document.getElementById('activeCycleBadge') || document.getElementById('headerCycleControls');
+      if(!anchor) return;
+      el=document.createElement('div'); el.id='bcLockStatusBar'; el.style.cssText='display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11px;font-weight:800;';
+      anchor.parentNode.insertBefore(el,anchor.nextSibling);
+    }
+    const closed=isCropClosed(c.id), rel=relevantPonds(c), done=rel.filter(p=>isPondClosed(p.id,c.id)||hasFullHarvest(p)).length;
+    if(DEVICE==='mobile'){
+      el.innerHTML=`<span style="padding:3px 7px;border-radius:999px;background:${closed?'#fee2e2':'#eff6ff'};color:${closed?'#991b1b':'#1d4ed8'};">${closed?'🔒 Crop Closed':'🔓 Crop Open'}${!closed&&rel.length?` • ${done}/${rel.length}`:''}</span>`;
+    } else {
+      el.innerHTML=`<span style="padding:5px 8px;border-radius:999px;border:1px solid ${closed?'#fecaca':'#bfdbfe'};background:${closed?'#fee2e2':'#eff6ff'};color:${closed?'#991b1b':'#1d4ed8'};">${closed?'🔒 Crop Closed':'🔓 Crop Open'}${!closed&&rel.length?` • ${done}/${rel.length} ponds closed`:''}</span>`+
+      (closed?`<button type="button" id="bcReactivateCrop" style="border:0;border-radius:7px;padding:5px 8px;background:#b91c1c;color:#fff;font-size:11px;font-weight:800;cursor:pointer">Reactivate Crop</button>`:`<button type="button" id="bcCloseCrop" ${rel.length&&done===rel.length?'':'disabled'} style="border:0;border-radius:7px;padding:5px 8px;background:#2563eb;color:#fff;font-size:11px;font-weight:800;cursor:pointer;opacity:${rel.length&&done===rel.length?'1':'.45'}">Close Crop</button>`)+
+      `<button type="button" id="bcManagePondLocks" style="border:0;border-radius:7px;padding:5px 8px;background:#475569;color:#fff;font-size:11px;font-weight:800;cursor:pointer">Pond Locks</button>`;
+      document.getElementById('bcCloseCrop')?.addEventListener('click',async()=>{
+        if(!rel.length||!rel.every(p=>isPondClosed(p.id,c.id)||hasFullHarvest(p))){alert('Complete Full/Final Harvest for every Grow-out and Transfer-in pond first.');return;}
+        try{for(const p of rel)if(!isPondClosed(p.id,c.id))await closePond(p,'Closed after Full/Final Harvest');await closeCrop(c,'Closed after all relevant ponds completed Full/Final Harvest');await writeAudit('CROP_CLOSED',c,'Closed after all relevant ponds completed Full/Final Harvest');renderLockStatus();}catch(e){console.error(e);alert('Crop could not be closed. Check cloud connection.');}
+      });
+      document.getElementById('bcReactivateCrop')?.addEventListener('click',async()=>{
+        if(!confirm(`Reactivate ${c.year} • ${c.crop}?`))return;
+        const reason=prompt('Mandatory reason for crop reactivation:','');if(!reason||!reason.trim()){alert('A reason is mandatory.');return;}
+        try{const rec={...cropLocks[String(c.id)],closed:false,reactivatedAt:todayIso(),reactivatedBy:DEVICE,reactivationReason:reason.trim()};cropLocks[String(c.id)]=rec;saveLocal();await cloudSet('cropLocks',String(c.id),rec);await writeAudit('CROP_REACTIVATED',c,reason.trim());renderLockStatus();}catch(e){console.error(e);alert('Crop reactivation failed.');}
+      });
+      document.getElementById('bcManagePondLocks')?.addEventListener('click',()=>managePonds(c,rel));
+    }
+  }
+  async function managePonds(c,rel){
+    if(!rel.length){alert('No Grow-out or Transfer-in ponds in this crop.');return;}
+    const list=rel.map((p,i)=>`${i+1}. ${p.name||p.id} — ${isPondClosed(p.id,c.id)?'🔒 Closed':'🔓 Open'}`).join('\n');
+    const n=Number(prompt(`Pond Locks — ${c.year} • ${c.crop}\n\n${list}\n\nEnter pond number:`,''))-1;
+    const p=rel[n]; if(!p)return;
+    if(!isPondClosed(p.id,c.id)){alert(`${p.name||p.id} is automatically closed when its Full/Final Harvest is recorded.`);return;}
+    await reactivatePondById(p.id);
+  }
+  function guardForm(id,resolver){ document.addEventListener('submit',e=>{if(e.target?.id!==id)return;const o=resolver()||{};if(!window.blueCrestAssertOperationalWrite(o)){e.preventDefault();e.stopImmediatePropagation();}},true); }
+  function wrap(name,fn){const orig=window[name];if(typeof orig!=='function'||orig.__bcLockWrapped)return;const w=fn(orig);w.__bcLockWrapped=true;window[name]=w;}
+  async function reactivatePondById(pid){
+    const c=activeC();
+    const p=getPond(pid);
+    if(!p){alert('Pond not found in the active crop.');return;}
+    const cid=String(p.cycleId || c.id);
+    if(!isPondClosed(p.id,cid)){alert(`${p.name||p.id} is already open.`);return;}
+    if(DEVICE!=='laptop'){alert('Pond reactivation is available only on the laptop.');return;}
+    if(!confirm(`Reactivate ${p.name||p.id}?`))return;
+    const reason=prompt(`Mandatory reason for reactivating ${p.name||p.id}:`,'');
+    if(!reason||!reason.trim()){alert('A reason is mandatory.');return;}
+    try{
+      const key=pkey(cid,p.id),rec={...pondLocks[key],closed:false,reactivatedAt:todayIso(),reactivatedBy:DEVICE,reactivationReason:reason.trim()};
+      pondLocks[key]=rec;saveLocal();await cloudSet('pondLocks',key,rec);
+      await writeAudit('POND_REACTIVATED',{...c,cycleId:cid,pondId:p.id,pondName:p.name,year:p.year||c.year,crop:p.crop||c.crop},reason.trim());
+      renderLockStatus();
+      if(typeof renderPondList==='function') setTimeout(()=>renderPondList(),0);
+    }catch(e){console.error(e);alert('Pond reactivation failed. Check cloud connection.');}
+  }
+  window.blueCrestReactivatePond=reactivatePondById;
+  function decoratePondCards(){
+    try{
+      const c=activeC();
+      const list=typeof getActivePonds==='function'?getActivePonds():[];
+      const container=document.getElementById('pondList') || document.getElementById('pondCardsList');
+      if(!container)return;
+      const cards=[...container.children];
+      cards.forEach((card,i)=>{
+        const p=list[i]; if(!p)return;
+        const closed=isPondClosed(p.id,c.id);
+        card.dataset.bcPondId=String(p.id);
+        const oldBadge=card.querySelector('[data-bc-pond-lock-badge]'); if(oldBadge)oldBadge.remove();
+        const oldBtn=card.querySelector('[data-bc-pond-reactivate]'); if(oldBtn)oldBtn.remove();
+        const oldActions=card.querySelector('[data-bc-pond-actions]'); if(oldActions)oldActions.remove();
+        if(DEVICE==='laptop'){
+          const actions=card.querySelector('.record-actions');
+          if(actions){
+            actions.setAttribute('data-bc-pond-actions','1');
+            if(closed){
+              [...actions.querySelectorAll('button')].forEach(b=>{b.style.display='none';});
+              const b=document.createElement('button');b.type='button';b.textContent='🔓 Reactivate';b.setAttribute('data-bc-pond-reactivate','1');b.className='small-button';b.style.cssText='font-weight:800;color:#1d4ed8;';b.onclick=()=>reactivatePondById(p.id);actions.appendChild(b);
+            }
+          }
+          if(closed){
+            const h=card.querySelector('h3'); if(h){const b=document.createElement('span');b.textContent=' 🔒 Pond Closed';b.setAttribute('data-bc-pond-lock-badge','1');b.style.cssText='font-size:11px;font-weight:800;color:#991b1b;background:#fee2e2;border-radius:999px;padding:3px 7px;margin-left:6px;white-space:nowrap;';h.appendChild(b);}
+          }
+        } else {
+          if(closed){
+            const top=card.querySelector('.flex.justify-between.items-center') || card.firstElementChild;
+            if(top){const b=document.createElement('span');b.textContent='🔒 Pond Closed';b.setAttribute('data-bc-pond-lock-badge','1');b.style.cssText='font-size:11px;font-weight:800;color:#991b1b;background:#fee2e2;border-radius:999px;padding:3px 7px;margin-left:6px;';top.appendChild(b);}
+          }
+        }
+      });
+    }catch(e){console.error('Pond lock card decoration error:',e);}
+  }
+  function installGuards(){
+    guardForm('sampleForm',()=>({pondId:document.getElementById('samplePond')?.value,cycleId:activeC().id}));
+    guardForm('treatmentForm',()=>({pondId:document.getElementById('treatmentPondSelect')?.value,cycleId:activeC().id}));
+    guardForm('harvestModalForm',()=>({pondId:document.getElementById('harvestPondSelect')?.value,cycleId:activeC().id}));
+    guardForm('stockTransferForm',()=>({pondId:document.getElementById('stockTransferFrom')?.value||document.getElementById('stockTransferTo')?.value,cycleId:activeC().id}));
+    guardForm('pondForm',()=>({cycleId:activeC().id}));
+        guardForm('feedAdjustmentForm',()=>({cycleId:activeC().id}));
+    if(DEVICE==='mobile'){
+      wrap('saveFeedToDb',orig=>async function(obj){if(!window.blueCrestAssertOperationalWrite({pondId:obj?.pondId||obj?.pond,cycleId:cycleOf(obj)}))return;return orig.apply(this,arguments);});
+      wrap('saveSamplingToDb',orig=>async function(obj){if(!window.blueCrestAssertOperationalWrite({pondId:obj?.pondId||obj?.pond,cycleId:cycleOf(obj)}))return;return orig.apply(this,arguments);});
+      wrap('saveTreatmentToDb',orig=>async function(obj){if(!window.blueCrestAssertOperationalWrite({pondId:obj?.pondId||obj?.pond,cycleId:cycleOf(obj)}))return;return orig.apply(this,arguments);});
+      wrap('saveHarvestToDb',orig=>async function(obj){if(!window.blueCrestAssertOperationalWrite({pondId:obj?.pondId||obj?.pond,cycleId:cycleOf(obj)}))return;const r=await orig.apply(this,arguments);await autoCloseForHarvest(obj);return r;});
+      ['deleteFeed','deleteSampling','deleteTreatment','deleteHarvest'].forEach(name=>wrap(name,orig=>function(id){const arr=name==='deleteFeed'?feedEntries:name==='deleteSampling'?samplingEntries:name==='deleteTreatment'?treatmentEntries:harvestEntries;const r=arr?.find(x=>String(x.id)===String(id)||String(x.firestoreId||'')===String(id)||String(x.legacyRecordId||'')===String(id));if(!window.blueCrestAssertOperationalWrite({pondId:pondIdOf(r),cycleId:cycleOf(r)}))return;return orig.apply(this,arguments);}));
+    }
+    ['promptDeleteSample','promptDeleteTreatment','promptDeleteHarvest','promptDeleteFeedRecord','promptDeletePond'].forEach(name=>wrap(name,orig=>function(id){const arr=name.includes('Sample')?samples:name.includes('Treatment')?treatments:name.includes('Harvest')?harvests:name.includes('Feed')?feedEntries:name.includes('Pond')?ponds:name.includes('Purchase')?purchases:stockReturns;const r=name.includes('Pond')?getPond(id):arr?.find(x=>String(x.id)===String(id)||String(x.firestoreId||'')===String(id)||String(x.legacyRecordId||'')===String(id));if(!window.blueCrestAssertOperationalWrite({pondId:name.includes('Pond')?id:pondIdOf(r),cycleId:cycleOf(r)}))return;return orig.apply(this,arguments);}));
+    ['editSample','editTreatment','editHarvest','editPond','editStockTransfer','editFeedRecord'].forEach(name=>wrap(name,orig=>function(id){const arr=name.includes('Sample')?samples:name.includes('Treatment')?treatments:name.includes('Harvest')?harvests:name.includes('Pond')?ponds:name.includes('Feed')?feedEntries:name.includes('StockTransfer')?stockTransfers:stockReturns;const r=name==='editPond'?getPond(id):arr?.find(x=>String(x.id)===String(id)||String(x.firestoreId||'')===String(id)||String(x.legacyRecordId||'')===String(id));if(!window.blueCrestAssertOperationalWrite({pondId:name==='editPond'?id:pondIdOf(r),cycleId:cycleOf(r)}))return;return orig.apply(this,arguments);}));
+    if(DEVICE==='laptop'){
+      wrap('submitHarvestFormDirectly',orig=>async function(){const pid=document.getElementById('harvestPondSelect')?.value;const type=document.getElementById('harvestType')?.value;const hid=document.getElementById('harvestId')?.value;if(!window.blueCrestAssertOperationalWrite({pondId:pid,cycleId:activeC().id}))return;const result=await orig.apply(this,arguments);const arr=typeof harvests!=='undefined'?harvests:[];const h=(hid&&arr.find(x=>String(x.id)===String(hid))) || (type?{pondId:pid,type,cycleId:activeC().id,year:activeC().year,crop:activeC().crop}:null);if(h&&['full','final harvest'].includes(String(h.type||'').toLowerCase())) await autoCloseForHarvest(h);return result;});
+      wrap('saveStockTransfer',orig=>function(e){const from=document.getElementById('stockTransferFrom')?.value,to=document.getElementById('stockTransferTo')?.value;if(!window.blueCrestAssertOperationalWrite({pondId:from,cycleId:activeC().id})||!window.blueCrestAssertOperationalWrite({pondId:to,cycleId:activeC().id}))return;return orig.apply(this,arguments);});
+      wrap('deleteStockTransfer',orig=>function(id){const r=(typeof stockTransfers!=='undefined'?stockTransfers:[]).find(x=>String(x.id)===String(id));const from=r?.fromPondId||r?.fromPond,to=r?.toPondId||r?.toPond;if(!window.blueCrestAssertOperationalWrite({pondId:from,cycleId:cycleOf(r)})||!window.blueCrestAssertOperationalWrite({pondId:to,cycleId:cycleOf(r)}))return;return orig.apply(this,arguments);});
+    }
+  }
+  function init(){
+    if(typeof db!=='undefined'&&db){
+      db.collection('pondLocks').onSnapshot(s=>{pondLocks={};s.docs.forEach(d=>pondLocks[d.id]={id:d.id,...d.data()});saveLocal();renderLockStatus();});
+      db.collection('cropLocks').onSnapshot(s=>{cropLocks={};s.docs.forEach(d=>cropLocks[d.id]={id:d.id,...d.data()});saveLocal();renderLockStatus();});
+    }
+    installGuards(); wrap('renderPondList',orig=>function(){const r=orig.apply(this,arguments);setTimeout(decoratePondCards,0);return r;}); setTimeout(()=>{renderLockStatus();decoratePondCards();reconcileExisting();},900);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+})();
+</script>
