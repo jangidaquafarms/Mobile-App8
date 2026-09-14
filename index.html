@@ -744,39 +744,95 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                     <button onclick="closePondModal()" class="text-slate-400 hover:text-slate-600 text-xl font-bold">&times;</button>
                 </div>
 
-                <form id="pondForm" onsubmit="handlePondSubmit(event)" class="space-y-4 text-sm">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Pond Name / ID *</label>
-                        <input type="text" id="newPondName" placeholder="e.g. P6" required class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 uppercase font-semibold">
-                    </div>
+                <form id="pondForm" onsubmit="handlePondSubmit(event)" class="space-y-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+            <label for="newPondName" class="block text-xs font-bold text-slate-600 mb-1">Pond Name *</label>
+            <input id="newPondName" required maxlength="30"
+                   class="w-full border border-slate-200 rounded-lg p-3 text-sm font-bold uppercase"
+                   placeholder="P1">
+        </div>
+        <div>
+            <label for="pondStockingDate" class="block text-xs font-bold text-slate-600 mb-1">Stocking Date *</label>
+            <input type="date" id="pondStockingDate" required
+                   class="w-full border border-slate-200 rounded-lg p-3 text-sm">
+        </div>
+    </div>
 
-                    <div class="grid grid-cols-3 gap-2">
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">Length (m) *</label>
-                            <input type="number" step="0.1" id="pondLength" placeholder="L" required oninput="calcPondArea()" class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">Breadth (m) *</label>
-                            <input type="number" step="0.1" id="pondBreadth" placeholder="B" required oninput="calcPondArea()" class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-semibold text-slate-600 mb-1">Area (m²)</label>
-                            <input type="text" id="pondArea" readonly placeholder="Auto L×B" class="w-full border border-slate-200 p-2.5 rounded-lg bg-slate-100 text-slate-700 font-bold outline-none">
-                        </div>
-                    </div>
+    <div class="grid grid-cols-2 gap-3">
+        <div>
+            <label for="pondLength" class="block text-xs font-bold text-slate-600 mb-1">Length (m) *</label>
+            <input type="number" id="pondLength" min="0" step="0.1" required
+                   oninput="calcPondArea()"
+                   class="w-full border border-slate-200 rounded-lg p-3 text-sm">
+        </div>
+        <div>
+            <label for="pondBreadth" class="block text-xs font-bold text-slate-600 mb-1">Breadth (m) *</label>
+            <input type="number" id="pondBreadth" min="0" step="0.1" required
+                   oninput="calcPondArea()"
+                   class="w-full border border-slate-200 rounded-lg p-3 text-sm">
+        </div>
+    </div>
 
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Stocking Date *</label>
-                        <input type="date" id="pondStockingDate" required class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
-                    </div>
+    <div>
+        <label for="pondArea" class="block text-xs font-bold text-slate-600 mb-1">Area</label>
+        <input id="pondArea" readonly
+               class="w-full border border-slate-200 rounded-lg p-3 text-sm bg-slate-50 font-bold">
+    </div>
 
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Stocking Count (PL Seeds) *</label>
-                        <input type="number" id="pondStockingCount" placeholder="e.g. 150000" required class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
-                    </div>
+    <div>
+        <label class="block text-xs font-bold text-slate-600 mb-2">Pond Type *</label>
+        <div class="grid grid-cols-3 gap-2">
+            <label class="cursor-pointer">
+                <input type="radio" name="pondType" value="Mother Pond" class="peer sr-only">
+                <span class="block text-center border border-slate-200 rounded-lg p-3 text-xs font-bold peer-checked:bg-blue-600 peer-checked:text-white peer-checked:border-blue-600">
+                    Mother Pond
+                </span>
+            </label>
+            <label class="cursor-pointer">
+                <input type="radio" name="pondType" value="Grow-out" class="peer sr-only" checked>
+                <span class="block text-center border border-slate-200 rounded-lg p-3 text-xs font-bold peer-checked:bg-blue-600 peer-checked:text-white peer-checked:border-blue-600">
+                    Grow-out
+                </span>
+            </label>
+            <label class="cursor-pointer">
+                <input type="radio" name="pondType" value="Transfer-in" class="peer sr-only">
+                <span class="block text-center border border-slate-200 rounded-lg p-3 text-xs font-bold peer-checked:bg-blue-600 peer-checked:text-white peer-checked:border-blue-600">
+                    Transfer-in
+                </span>
+            </label>
+        </div>
+        <small id="pondTypeHelp" class="block text-[11px] text-slate-400 mt-1">Select one pond type.</small>
+    </div>
 
-                    <button type="submit" id="pondModalSubmitBtn" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-xl font-bold shadow-md transition">Save Pond</button>
-                </form>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+            <label for="initialStockingNumber" class="block text-xs font-bold text-slate-600 mb-1">Initial Stocking Number (Pcs) *</label>
+            <input type="number" id="initialStockingNumber" min="1" step="1"
+                   class="w-full border border-slate-200 rounded-lg p-3 text-sm"
+                   placeholder="Enter initial stocking number">
+            <small id="stockingNumberHelp" class="block text-[11px] text-slate-400 mt-1">Enter initial stocking number.</small>
+        </div>
+        <div>
+            <label for="pondSeedPrice" class="block text-xs font-bold text-slate-600 mb-1">Seed Price (₹/PL) *</label>
+            <input type="number" id="pondSeedPrice" min="0" step="0.0001"
+                   class="w-full border border-slate-200 rounded-lg p-3 text-sm"
+                   placeholder="e.g. 0.55">
+            <small id="pondSeedPriceHelp" class="block text-[11px] text-slate-400 mt-1">Seed price for this pond.</small>
+        </div>
+    </div>
+
+    <div class="text-[11px] bg-slate-50 border border-slate-200 rounded-lg p-3">
+        <strong>Cycle:</strong> <span id="pondModalCycleContext"></span>
+    </div>
+
+    <div class="flex gap-2 pt-2">
+        <button type="submit" class="flex-1 bg-blue-600 text-white rounded-lg p-3 font-bold">Save Pond Profile</button>
+        <button type="button" id="cancelPondEdit" onclick="closePondModal()"
+                class="px-4 border border-slate-200 rounded-lg font-bold text-slate-600 hidden">Cancel</button>
+    </div>
+    <p id="pondMessage" class="text-xs text-rose-500"></p>
+</form>
             </div>
         </div>
 
@@ -1280,15 +1336,11 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
 
             db.collection('ponds').onSnapshot(snap => {
                 if (!snap.empty) {
-                    ponds = snap.docs.map(doc => ({
-                        ...doc.data(),
-                        firestoreId: doc.id,
-                        year: doc.data().year || DEFAULT_CYCLE_YEAR,
-                        crop: doc.data().crop || DEFAULT_CYCLE_CROP,
-                        cycleId: doc.data().cycleId || `${Number(doc.data().year || DEFAULT_CYCLE_YEAR)}|${String(doc.data().crop || DEFAULT_CYCLE_CROP).toLowerCase()}`
-                    }));
+                    const rawPonds = snap.docs.map(doc => normalizePondRecord(doc.data(), doc.id));
+                    ponds = dedupePondsByCycleAndName(rawPonds);
                     localStorage.setItem('bc_ponds', JSON.stringify(ponds));
                 } else if (ponds.length > 0) {
+                    ponds = dedupePondsByCycleAndName(ponds);
                     ponds.forEach(p => savePondToDb(p));
                 }
                 syncPondDropdown();
@@ -1420,38 +1472,122 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
             renderHarvestList();
         }
 
+        function canonicalPondFirestoreId(cycleId, pondId) {
+            return `${String(cycleId || '').trim()}__${String(pondId || '').trim()}`;
+        }
+
+        function pondLogicalKey(p) {
+            const cycle = String(p?.cycleId || '').trim();
+            const name = String(p?.id || p?.name || p?.pondName || '').trim().toUpperCase();
+            return `${cycle}__${name}`;
+        }
+
+        function normalizePondRecord(raw, firestoreId = '') {
+            const p = { ...(raw || {}) };
+            const cycleId = String(
+                p.cycleId ||
+                `${Number(p.year || DEFAULT_CYCLE_YEAR)}|${String(p.crop || DEFAULT_CYCLE_CROP).toLowerCase()}`
+            );
+            const id = String(p.id || p.name || p.pondName || firestoreId || '').trim().toUpperCase();
+            return {
+                ...p,
+                id,
+                name: p.name || id,
+                firestoreId: firestoreId || p.firestoreId || canonicalPondFirestoreId(cycleId, id),
+                year: Number(p.year || DEFAULT_CYCLE_YEAR),
+                crop: p.crop || DEFAULT_CYCLE_CROP,
+                cycleId,
+                pondType: p.pondType || p.type || 'Grow-out',
+                initialStockingNumber: Number(p.initialStockingNumber ?? p.stockingCount ?? 0),
+                stockingCount: Number(p.stockingCount ?? p.initialStockingNumber ?? 0),
+                seedPrice: Number(p.seedPrice ?? p.pondSeedPrice ?? 0)
+            };
+        }
+
+        function dedupePondsByCycleAndName(records) {
+            const map = new Map();
+            (Array.isArray(records) ? records : []).forEach(raw => {
+                const p = normalizePondRecord(raw, raw?.firestoreId);
+                const key = pondLogicalKey(p);
+                if (!key) return;
+                const existing = map.get(key);
+                if (!existing) {
+                    map.set(key, p);
+                    return;
+                }
+
+                const canonical = canonicalPondFirestoreId(p.cycleId, p.id);
+                const existingCanonical = canonicalPondFirestoreId(existing.cycleId, existing.id);
+                const pIsCanonical = String(p.firestoreId) === canonical;
+                const existingIsCanonical = String(existing.firestoreId) === existingCanonical;
+
+                // Prefer the canonical Firestore record. If neither is canonical,
+                // keep the record containing more pond-profile information.
+                if (pIsCanonical && !existingIsCanonical) {
+                    map.set(key, p);
+                } else if (pIsCanonical === existingIsCanonical) {
+                    const score = x =>
+                        ['length','breadth','area','stockingDate','stockingCount','pondType','initialStockingNumber','seedPrice']
+                        .reduce((n, k) => n + ((x[k] !== undefined && x[k] !== '' && x[k] !== null) ? 1 : 0), 0);
+                    if (score(p) > score(existing)) map.set(key, p);
+                }
+            });
+            return Array.from(map.values());
+        }
+
         function savePondToDb(pondObj) {
             const c = getActiveCycle();
-            pondObj.year = pondObj.year || Number(c.year);
-            pondObj.crop = pondObj.crop || c.crop;
-            pondObj.cycleId = pondObj.cycleId || c.id;
-            const firestoreId = pondObj.firestoreId || `${pondObj.cycleId}__${pondObj.id}`;
+            const normalized = normalizePondRecord({
+                ...pondObj,
+                year: Number(pondObj.year || c.year),
+                crop: pondObj.crop || c.crop,
+                cycleId: pondObj.cycleId || c.id
+            });
+
+            normalized.firestoreId = canonicalPondFirestoreId(normalized.cycleId, normalized.id);
 
             if (isFirebaseConnected && db) {
-                db.collection('ponds').doc(firestoreId).set(pondObj);
-            } else {
-                const idx = ponds.findIndex(p => p.id === pondObj.id && String(p.cycleId) === String(pondObj.cycleId));
-                if (idx >= 0) ponds[idx] = pondObj; else ponds.push(pondObj);
-                localStorage.setItem('bc_ponds', JSON.stringify(ponds));
-                syncPondDropdown();
-                renderPondList();
-                renderAllPondsSummary();
+                return db.collection('ponds').doc(normalized.firestoreId).set(normalized, { merge: true });
             }
+
+            const idx = ponds.findIndex(p => pondLogicalKey(p) === pondLogicalKey(normalized));
+            if (idx >= 0) ponds[idx] = normalized; else ponds.push(normalized);
+            ponds = dedupePondsByCycleAndName(ponds);
+            localStorage.setItem('bc_ponds', JSON.stringify(ponds));
+            syncPondDropdown();
+            renderPondList();
+            renderAllPondsSummary();
+            return Promise.resolve();
         }
 
         function deletePondFromDb(pondId) {
             const c = getActiveCycle();
-            const pond = ponds.find(p => p.id === pondId && String(p.cycleId) === String(c.id));
-            const firestoreId = pond?.firestoreId || `${c.id}__${pondId}`;
+            const matches = ponds.filter(p =>
+                String(p.id || '').toUpperCase() === String(pondId || '').toUpperCase() &&
+                String(p.cycleId) === String(c.id)
+            );
+
+            const refs = new Set();
+            refs.add(canonicalPondFirestoreId(c.id, pondId));
+            matches.forEach(p => {
+                if (p.firestoreId) refs.add(String(p.firestoreId));
+            });
+
             if (isFirebaseConnected && db) {
-                db.collection('ponds').doc(firestoreId).delete();
-            } else {
-                ponds = ponds.filter(p => !(p.id === pondId && String(p.cycleId) === String(c.id)));
-                localStorage.setItem('bc_ponds', JSON.stringify(ponds));
-                syncPondDropdown();
-                renderPondList();
-                renderAllPondsSummary();
+                return Promise.all(Array.from(refs).map(id =>
+                    db.collection('ponds').doc(id).delete().catch(() => null)
+                ));
             }
+
+            ponds = ponds.filter(p => !(
+                String(p.id || '').toUpperCase() === String(pondId || '').toUpperCase() &&
+                String(p.cycleId) === String(c.id)
+            ));
+            localStorage.setItem('bc_ponds', JSON.stringify(ponds));
+            syncPondDropdown();
+            renderPondList();
+            renderAllPondsSummary();
+            return Promise.resolve();
         }
 
         function getActiveFeedEntries() {
@@ -2681,43 +2817,74 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
         function handlePondSubmit(e) {
             if (isViewOnlyMode) { e.preventDefault(); alert('View-Only mode: data changes are disabled.'); return; }
             e.preventDefault();
+
             const name = document.getElementById('newPondName').value.trim().toUpperCase();
             const length = parseFloat(document.getElementById('pondLength').value) || 0;
             const breadth = parseFloat(document.getElementById('pondBreadth').value) || 0;
             const area = length * breadth;
             const stockingDate = document.getElementById('pondStockingDate').value;
-            const stockingCount = parseInt(document.getElementById('pondStockingCount').value, 10) || 0;
+            const initialStockingNumber =
+                parseInt(document.getElementById('initialStockingNumber').value, 10) || 0;
+            const seedPrice = parseFloat(document.getElementById('pondSeedPrice').value) || 0;
+            const pondType = document.querySelector('input[name="pondType"]:checked')?.value || 'Grow-out';
 
             const c = getActiveCycle();
             const activePonds = getActivePonds();
 
-            if (editingPondId !== null && name !== editingPondId && activePonds.some(p => p.id === name)) {
+            if (!name) return alert('Please enter pond name.');
+            if (length <= 0 || breadth <= 0) return alert('Please enter valid pond dimensions.');
+            if (initialStockingNumber <= 0) return alert('Please enter initial stocking number.');
+            if (seedPrice < 0) return alert('Please enter a valid seed price.');
+
+            if (editingPondId !== null &&
+                name !== String(editingPondId).toUpperCase() &&
+                activePonds.some(p => String(p.id).toUpperCase() === name)) {
                 alert(`Pond ${name} already exists in ${c.year} ${c.crop}.`);
                 return;
             }
-            if (editingPondId === null && activePonds.some(p => p.id === name)) {
+
+            if (editingPondId === null &&
+                activePonds.some(p => String(p.id).toUpperCase() === name)) {
                 alert(`Pond ${name} already exists in ${c.year} ${c.crop}.`);
                 return;
             }
 
             const existing = editingPondId !== null
-                ? ponds.find(p => p.id === editingPondId && String(p.cycleId) === String(c.id))
+                ? ponds.find(p =>
+                    String(p.id).toUpperCase() === String(editingPondId).toUpperCase() &&
+                    String(p.cycleId) === String(c.id))
                 : null;
+
             const pondObj = {
                 ...(existing || {}),
                 id: name,
-                length, breadth, area, stockingDate, stockingCount,
+                name,
+                length,
+                breadth,
+                area,
+                stockingDate,
+                stockingCount: initialStockingNumber,
+                initialStockingNumber,
+                seedPrice,
+                pondType,
                 year: Number(c.year),
                 crop: c.crop,
                 cycleId: c.id
             };
-            
-            if (editingPondId !== null && name !== editingPondId) {
-                deletePondFromDb(editingPondId);
+
+            const oldName = editingPondId;
+            const savePromise = savePondToDb(pondObj);
+
+            if (oldName !== null && String(oldName).toUpperCase() !== name) {
+                savePromise.then(() => deletePondFromDb(oldName));
             }
 
-            savePondToDb(pondObj);
-            closePondModal();
+            savePromise.then(() => {
+                closePondModal();
+            }).catch(err => {
+                console.error('Pond save failed:', err);
+                alert('Pond could not be saved. Please try again.');
+            });
         }
 
         function deletePond(pondId) {
@@ -3128,33 +3295,64 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
         }
 
         function openPondModal(pondId = null) {
+            const c = getActiveCycle();
             document.getElementById('pondModal').classList.remove('hidden');
             const modalTitle = document.getElementById('pondModalTitleText');
             const submitBtn = document.getElementById('pondModalSubmitBtn');
+            const cycleCtx = document.getElementById('pondModalCycleContext');
+            if (cycleCtx) cycleCtx.textContent = `${c.year} • ${c.crop}`;
 
             if (pondId !== null) {
                 editingPondId = pondId;
                 modalTitle.innerText = `Edit Pond (${pondId})`;
                 submitBtn.innerText = 'Update Pond';
-                const p = ponds.find(item => item.id === pondId);
+                const p = ponds.find(item =>
+                    String(item.id).toUpperCase() === String(pondId).toUpperCase() &&
+                    String(item.cycleId) === String(c.id)
+                );
                 if (p) {
-                    document.getElementById('newPondName').value = p.id;
-                    document.getElementById('pondLength').value = p.length;
-                    document.getElementById('pondBreadth').value = p.breadth;
+                    document.getElementById('newPondName').value = p.id || '';
+                    document.getElementById('pondLength').value = p.length ?? '';
+                    document.getElementById('pondBreadth').value = p.breadth ?? '';
                     calcPondArea();
-                    document.getElementById('pondStockingDate').value = p.stockingDate;
-                    document.getElementById('pondStockingCount').value = p.stockingCount;
+                    document.getElementById('pondStockingDate').value = p.stockingDate || '';
+                    document.getElementById('initialStockingNumber').value =
+                        p.initialStockingNumber ?? p.stockingCount ?? '';
+                    document.getElementById('pondSeedPrice').value = p.seedPrice ?? '';
+                    const type = p.pondType || p.type || 'Grow-out';
+                    const radio = document.querySelector(`input[name="pondType"][value="${type}"]`);
+                    if (radio) radio.checked = true;
                 }
             } else {
                 editingPondId = null;
                 modalTitle.innerText = 'Create New Pond';
-                submitBtn.innerText = 'Save Pond';
+                submitBtn.innerText = 'Save Pond Profile';
                 document.getElementById('pondForm').reset();
                 document.getElementById('pondArea').value = '';
-                document.getElementById('newPondName').value = 'P' + (ponds.length + 1);
+                const used = new Set(
+                    ponds.filter(p => String(p.cycleId) === String(c.id))
+                         .map(p => String(p.id).toUpperCase())
+                );
+                let n = 1;
+                while (used.has(`P${n}`)) n++;
+                document.getElementById('newPondName').value = `P${n}`;
                 document.getElementById('pondStockingDate').value = getSystemLatestDate();
+                document.querySelector('input[name="pondType"][value="Grow-out"]').checked = true;
             }
         }
+
+        document.addEventListener('change', e => {
+            if (e.target && e.target.name === 'pondType') {
+                const help = document.getElementById('pondTypeHelp');
+                if (help) {
+                    help.textContent = e.target.value === 'Mother Pond'
+                        ? 'Mother Pond: source pond for stock transfers.'
+                        : e.target.value === 'Transfer-in'
+                            ? 'Transfer-in: pond receiving transferred stock.'
+                            : 'Grow-out: normal grow-out production pond.';
+                }
+            }
+        });
 
         function closePondModal() {
             document.getElementById('pondModal').classList.add('hidden');
