@@ -1368,7 +1368,9 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                     const netFeed = Number(d.netFeed != null ? d.netFeed : ((currCumulativeFeed != null ? currCumulativeFeed : 0) - prevCumulativeFeed));
                     return {
                         ...d,
-                        id: d.id != null ? d.id : doc.id,
+                        id: doc.id,
+                        firestoreId: doc.id,
+                        legacyRecordId: d.id != null ? d.id : null,
                         pond,
                         pondId: d.pondId || pond,
                         year, crop, cycleId,
@@ -1398,7 +1400,9 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                     const product = d.product || d.productName || '';
                     return {
                         ...d,
-                        id: d.id != null ? d.id : doc.id,
+                        id: doc.id,
+                        firestoreId: doc.id,
+                        legacyRecordId: d.id != null ? d.id : null,
                         pond,
                         pondId: d.pondId || pond,
                         product,
@@ -1429,7 +1433,9 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                     const finalValue = Number(d.finalValue != null ? d.finalValue : (d.value != null ? d.value : (d.totalValue != null ? d.totalValue : biomass * price)));
                     return {
                         ...d,
-                        id: d.id != null ? d.id : doc.id,
+                        id: doc.id,
+                        firestoreId: doc.id,
+                        legacyRecordId: d.id != null ? d.id : null,
                         pond,
                         pondId: d.pondId || pond,
                         year, crop, cycleId,
@@ -1620,15 +1626,43 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
             }
         }
 
-        function deleteFeedFromDb(entryId) {
+        // Cloud deletion must always use the actual Firestore document ID.
+        // Older records may have a different application-level `id` field.
+        function resolveFirestoreRecordId(collectionName, recordId, records) {
+            const list = Array.isArray(records) ? records : [];
+            const wanted = String(recordId ?? '');
+            const found = list.find(r =>
+                String(r?.firestoreId ?? '') === wanted ||
+                String(r?.id ?? '') === wanted ||
+                String(r?.legacyRecordId ?? '') === wanted
+            );
+            return String(found?.firestoreId || found?.id || recordId);
+        }
+
+        async function deleteCloudRecord(collectionName, recordId, records, localSetter) {
+            const firestoreId = resolveFirestoreRecordId(collectionName, recordId, records);
             if (isFirebaseConnected && db) {
-                db.collection('feeds').doc(entryId.toString()).delete();
-            } else {
-                feedEntries = feedEntries.filter(item => item.id !== entryId);
-                localStorage.setItem('bc_feeds', JSON.stringify(feedEntries));
-                recalculateCumulatives();
-                renderAllPondsSummary();
-                renderHistory();
+                await db.collection(collectionName).doc(firestoreId).delete();
+            }
+            if (typeof localSetter === 'function') localSetter();
+        }
+
+        async function deleteFeedFromDb(entryId) {
+            try {
+                await deleteCloudRecord('feeds', entryId, feedEntries, () => {
+                    feedEntries = feedEntries.filter(item =>
+                        String(item.id) !== String(entryId) &&
+                        String(item.firestoreId || '') !== String(entryId) &&
+                        String(item.legacyRecordId || '') !== String(entryId)
+                    );
+                    localStorage.setItem('bc_feeds', JSON.stringify(feedEntries));
+                    recalculateCumulatives();
+                    renderAllPondsSummary();
+                    renderHistory();
+                });
+            } catch (err) {
+                console.error('Firestore feed delete error:', err);
+                alert('Feed record could not be deleted. Please try again.');
             }
         }
 
@@ -1645,13 +1679,20 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
             }
         }
 
-        function deleteSamplingFromDb(sampleId) {
-            if (isFirebaseConnected && db) {
-                db.collection('sampling').doc(sampleId.toString()).delete();
-            } else {
-                samplingEntries = samplingEntries.filter(s => s.id !== sampleId);
-                localStorage.setItem('bc_sampling', JSON.stringify(samplingEntries));
-                renderSamplingList();
+        async function deleteSamplingFromDb(sampleId) {
+            try {
+                await deleteCloudRecord('sampling', sampleId, samplingEntries, () => {
+                    samplingEntries = samplingEntries.filter(s =>
+                        String(s.id) !== String(sampleId) &&
+                        String(s.firestoreId || '') !== String(sampleId) &&
+                        String(s.legacyRecordId || '') !== String(sampleId)
+                    );
+                    localStorage.setItem('bc_sampling', JSON.stringify(samplingEntries));
+                    renderSamplingList();
+                });
+            } catch (err) {
+                console.error('Firestore sampling delete error:', err);
+                alert('Sampling entry could not be deleted. Please try again.');
             }
         }
 
@@ -1688,13 +1729,20 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
             }
         }
 
-        function deleteTreatmentFromDb(treatId) {
-            if (isFirebaseConnected && db) {
-                db.collection('treatments').doc(treatId.toString()).delete();
-            } else {
-                treatmentEntries = treatmentEntries.filter(t => t.id !== treatId);
-                localStorage.setItem('bc_treatments', JSON.stringify(treatmentEntries));
-                renderTreatmentList();
+        async function deleteTreatmentFromDb(treatId) {
+            try {
+                await deleteCloudRecord('treatments', treatId, treatmentEntries, () => {
+                    treatmentEntries = treatmentEntries.filter(t =>
+                        String(t.id) !== String(treatId) &&
+                        String(t.firestoreId || '') !== String(treatId) &&
+                        String(t.legacyRecordId || '') !== String(treatId)
+                    );
+                    localStorage.setItem('bc_treatments', JSON.stringify(treatmentEntries));
+                    renderTreatmentList();
+                });
+            } catch (err) {
+                console.error('Firestore treatment delete error:', err);
+                alert('Treatment record could not be deleted. Please try again.');
             }
         }
 
@@ -1722,13 +1770,20 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
             }
         }
 
-        function deleteHarvestFromDb(harvestId) {
-            if (isFirebaseConnected && db) {
-                db.collection('harvests').doc(harvestId.toString()).delete();
-            } else {
-                harvestEntries = harvestEntries.filter(h => h.id !== harvestId);
-                localStorage.setItem('bc_harvests', JSON.stringify(harvestEntries));
-                renderHarvestList();
+        async function deleteHarvestFromDb(harvestId) {
+            try {
+                await deleteCloudRecord('harvests', harvestId, harvestEntries, () => {
+                    harvestEntries = harvestEntries.filter(h =>
+                        String(h.id) !== String(harvestId) &&
+                        String(h.firestoreId || '') !== String(harvestId) &&
+                        String(h.legacyRecordId || '') !== String(harvestId)
+                    );
+                    localStorage.setItem('bc_harvests', JSON.stringify(harvestEntries));
+                    renderHarvestList();
+                });
+            } catch (err) {
+                console.error('Firestore harvest delete error:', err);
+                alert('Harvest record could not be deleted. Please try again.');
             }
         }
 
