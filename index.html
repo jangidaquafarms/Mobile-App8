@@ -1666,16 +1666,46 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
             }
         }
 
-        function saveSamplingToDb(sampleObj) {
+        async function saveSamplingToDb(sampleObj) {
             const c = getActiveCycle();
-            const normalized = { ...sampleObj, year: Number(c.year), crop: c.crop, cycleId: c.id };
+            // When an older/mobile record carries a legacy numeric ID, the edit form
+            // can still locate it via legacyRecordId. Always resolve the real
+            // Firestore document ID before writing, otherwise mobile would create a
+            // second sampling document and the laptop would continue showing the old one.
+            const sourceId = sampleObj?.id != null ? sampleObj.id : editingSampleId;
+            const existing = samplingEntries.find(s =>
+                String(s.id) === String(sourceId) ||
+                String(s.firestoreId || '') === String(sourceId) ||
+                String(s.legacyRecordId || '') === String(sourceId)
+            );
+            const firestoreId = existing?.firestoreId || existing?.id || String(sourceId);
+            const normalized = {
+                ...(existing || {}),
+                ...sampleObj,
+                id: firestoreId,
+                firestoreId,
+                legacyRecordId: existing?.legacyRecordId ?? sampleObj?.legacyRecordId ?? null,
+                year: Number(c.year),
+                crop: c.crop,
+                cycleId: c.id
+            };
             if (isFirebaseConnected && db) {
-                db.collection('sampling').doc(normalized.id.toString()).set(normalized);
+                try {
+                    await db.collection('sampling').doc(String(firestoreId)).set(normalized, { merge: true });
+                    return true;
+                } catch (err) {
+                    console.error('Firestore sampling write error:', err);
+                    alert('Sampling record could not be saved to Cloud. Please try again.');
+                    return false;
+                }
             } else {
-                const idx = samplingEntries.findIndex(s => s.id === normalized.id);
+                const idx = samplingEntries.findIndex(s =>
+                    String(s.id) === String(firestoreId) || String(s.firestoreId || '') === String(firestoreId)
+                );
                 if (idx >= 0) samplingEntries[idx] = normalized; else samplingEntries.push(normalized);
                 localStorage.setItem('bc_sampling', JSON.stringify(samplingEntries));
                 renderSamplingList();
+                return true;
             }
         }
 
@@ -2472,8 +2502,8 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                                 <span class="text-[11px] font-semibold text-purple-700 bg-purple-50 border border-purple-100 px-2 py-0.5 rounded truncate max-w-[120px]">${item.purpose}</span>
                             </div>
                             <div class="flex items-center gap-2">
-                                <button onclick="openTreatmentModal(${item.id})" class="text-slate-500 hover:text-blue-600 transition">✏️</button>
-                                <button onclick="deleteTreatment(${item.id})" class="text-slate-400 hover:text-rose-600 transition text-sm">🗑️</button>
+                                <button type="button" onclick=\'openTreatmentModal(${JSON.stringify(String(item.id))})\' class="text-slate-500 hover:text-blue-600 transition">✏️</button>
+                                <button type="button" onclick=\'deleteTreatment(${JSON.stringify(String(item.id))})\' class="text-slate-400 hover:text-rose-600 transition text-sm">🗑️</button>
                             </div>
                         </div>
                         <div class="grid grid-cols-2 gap-2 text-xs">
@@ -2843,8 +2873,9 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                 notes 
             };
 
-            saveSamplingToDb(sampleObj);
-            closeSamplingModal();
+            saveSamplingToDb(sampleObj).then(saved => {
+                if (saved) closeSamplingModal();
+            });
         }
 
         function deleteSampling(id) {
@@ -3289,7 +3320,11 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                 editingTreatmentId = id;
                 modalTitle.innerText = "Edit Treatment Entry";
                 submitBtn.innerText = "Update Treatment";
-                const treat = getActiveTreatmentEntries().find(t => t.id === id);
+                const treat = getActiveTreatmentEntries().find(t =>
+                    String(t.id) === String(id) ||
+                    String(t.firestoreId || '') === String(id) ||
+                    String(t.legacyRecordId || '') === String(id)
+                );
                 if (treat) {
                     document.getElementById('treatmentDate').value = treat.date;
                     document.getElementById('treatmentPond').value = treat.pond;
