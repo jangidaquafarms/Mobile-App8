@@ -3099,7 +3099,9 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
         }
 
         function exportSamplingCSV() {
-            const data = samplingPondFilter === 'ALL' ? samplingEntries : samplingEntries.filter(s => s.pond === samplingPondFilter);
+            const c = getActiveCycle();
+            const cycleData = samplingEntries.filter(s => String(s.cycleId || `${Number(s.year || DEFAULT_CYCLE_YEAR)}|${String(s.crop || DEFAULT_CYCLE_CROP).toLowerCase()}`) === String(c.id));
+            const data = samplingPondFilter === 'ALL' ? cycleData : cycleData.filter(s => s.pond === samplingPondFilter);
             if (!data.length) return alert("No sampling records to export.");
             const headers = ["Sample ID", "Date", "Pond No", "Sample Weight (gm)", "Count (pcs)", "ABW (gm)", "Growth (gm)", "Prev Cumulative Feed (kg)", "Curr Cumulative Feed (kg)", "Net Feed Consumption (kg)", "DOC", "Notes"];
             const rows = data.map(s => {
@@ -3124,7 +3126,9 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
         }
 
         function exportTreatmentCSV() {
-            const data = treatmentPondFilter === 'ALL' ? treatmentEntries : treatmentEntries.filter(t => t.pond === treatmentPondFilter);
+            const c = getActiveCycle();
+            const cycleData = treatmentEntries.filter(t => String(t.cycleId || `${Number(t.year || DEFAULT_CYCLE_YEAR)}|${String(t.crop || DEFAULT_CYCLE_CROP).toLowerCase()}`) === String(c.id));
+            const data = treatmentPondFilter === 'ALL' ? cycleData : cycleData.filter(t => t.pond === treatmentPondFilter);
             if (!data.length) return alert("No treatment records to export.");
             const headers = ["Treatment ID", "Date", "Pond No", "Category", "Product Name", "Quantity", "Unit", "Purpose", "DOC", "Notes"];
             const rows = data.map(t => {
