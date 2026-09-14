@@ -20,28 +20,35 @@
             overflow: hidden;
         }
 
+        /* Keep header and content in a real flex layout. Do NOT position the
+           header/content independently: iOS Safari can retain a visual scroll
+           offset after a modal/form closes, which makes the first card appear
+           underneath a fixed header. With the header as a normal flex child,
+           the scroll area can never move behind it. */
         .app-fixed-header {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
+            position: relative;
+            top: auto;
+            left: auto;
+            right: auto;
             z-index: 30;
+            flex: 0 0 auto;
+            width: 100%;
         }
 
-        /* The header is fixed. Keep the content area physically below it rather
-           than using padding-top; this avoids iOS Safari placing the first card
-           underneath the header on initial load or after a tab change. */
         #mainAppContainer {
-            --app-header-height: 0px;
             position: relative;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
         }
 
         .app-scroll-content {
-            position: absolute;
-            top: var(--app-header-height, 0px);
-            left: 0;
-            right: 0;
-            bottom: 0;
+            position: relative;
+            top: auto;
+            left: auto;
+            right: auto;
+            bottom: auto;
+            flex: 1 1 auto;
             width: 100%;
             max-width: 28rem;
             margin-left: auto;
@@ -51,6 +58,7 @@
             overflow-y: auto;
             -webkit-overflow-scrolling: touch;
             overscroll-behavior-y: contain;
+            overflow-anchor: none;
             scroll-padding-top: 0;
             padding: 1rem 1rem 7rem !important;
         }
@@ -2025,11 +2033,10 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
         }
 
         function syncAppLayout() {
+            // Header and scroll content now participate in the same flex layout,
+            // so no header-height calculation or absolute positioning is needed.
             const app = document.getElementById('mainAppContainer');
-            const header = document.querySelector('.app-fixed-header');
-            if (!app || !header) return;
-            const height = Math.ceil(header.getBoundingClientRect().height);
-            app.style.setProperty('--app-header-height', `${height}px`);
+            if (app) app.style.removeProperty('--app-header-height');
         }
 
         // Keep the scroll content exactly below the fixed header on iPhone/iPad.
@@ -2037,6 +2044,11 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
         window.addEventListener('orientationchange', () => setTimeout(syncAppLayout, 250));
 
         function resetMobileContentScroll() {
+            // Blur a modal control before hiding the modal. On iOS Safari, leaving
+            // focus on a now-hidden submit/input control can trigger an automatic
+            // scroll adjustment in the underlying document.
+            try { document.activeElement?.blur?.(); } catch (e) {}
+
             const scrollContent = document.querySelector('.app-scroll-content');
             if (scrollContent) {
                 scrollContent.scrollTop = 0;
@@ -2045,17 +2057,13 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                     setTimeout(() => { scrollContent.scrollTop = 0; }, 50);
                 });
             }
-            // Prevent iOS Safari from retaining a page-level visual scroll offset
-            // after a modal/form closes, which can move the content under the fixed nav.
             window.scrollTo(0, 0);
             syncAppLayout();
         }
 
         function switchTab(tab) {
             const scrollContent = document.querySelector('.app-scroll-content');
-            // Every tab must open from its own top position. Without resetting the
-            // shared scroll container, iOS Safari can retain the previous tab's
-            // scrollTop and place the new tab header underneath the fixed nav.
+            // Every tab opens from the top of the shared scroll area.
             if (scrollContent) scrollContent.scrollTop = 0;
 
             const tabs = ['home', 'pond', 'feed', 'sampling', 'treatment', 'harvest'];
