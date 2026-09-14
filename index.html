@@ -2036,6 +2036,21 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
         window.addEventListener('resize', syncAppLayout);
         window.addEventListener('orientationchange', () => setTimeout(syncAppLayout, 250));
 
+        function resetMobileContentScroll() {
+            const scrollContent = document.querySelector('.app-scroll-content');
+            if (scrollContent) {
+                scrollContent.scrollTop = 0;
+                requestAnimationFrame(() => {
+                    scrollContent.scrollTop = 0;
+                    setTimeout(() => { scrollContent.scrollTop = 0; }, 50);
+                });
+            }
+            // Prevent iOS Safari from retaining a page-level visual scroll offset
+            // after a modal/form closes, which can move the content under the fixed nav.
+            window.scrollTo(0, 0);
+            syncAppLayout();
+        }
+
         function switchTab(tab) {
             const scrollContent = document.querySelector('.app-scroll-content');
             // Every tab must open from its own top position. Without resetting the
@@ -2707,6 +2722,7 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
 
         function closeHarvestModal() {
             document.getElementById('harvestModal').classList.add('hidden');
+            resetMobileContentScroll();
         }
 
         function handleHarvestSubmit(e) {
@@ -3352,6 +3368,7 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
         function closeTreatmentModal() {
             document.getElementById('treatmentModal').classList.add('hidden');
             document.getElementById('treatmentOptionsList')?.classList.add('hidden');
+            resetMobileContentScroll();
         }
 
         function openSamplingModal(id = null) {
@@ -3403,6 +3420,7 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
 
         function closeSamplingModal() {
             document.getElementById('samplingModal').classList.add('hidden');
+            resetMobileContentScroll();
         }
 
         function calcABW() {
@@ -3473,6 +3491,7 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
 
         function closePondModal() {
             document.getElementById('pondModal').classList.add('hidden');
+            resetMobileContentScroll();
         }
 
         function calcPondArea() {
@@ -3546,9 +3565,8 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
 
         function closeModal() {
             document.getElementById('feedModal').classList.add('hidden');
-            // Return focus to the app content without changing the user's
-            // feed-history scroll position. The pond selector stays fixed.
             document.getElementById('feedView')?.focus?.({ preventScroll: true });
+            resetMobileContentScroll();
         }
 
         function openFeedDropdown(inputEl) {
