@@ -2847,6 +2847,9 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
             }
         }
 
+        // Negative inventory is intentionally allowed. Operational entries may be
+        // recorded before the purchase bill is entered; later purchases will settle
+        // the inventory balance and FIFO costing can use the actual purchase lots.
         function handleTreatmentSubmit(e) {
             if (isViewOnlyMode) { e.preventDefault(); alert('View-Only mode: data changes are disabled.'); return; }
             e.preventDefault();
