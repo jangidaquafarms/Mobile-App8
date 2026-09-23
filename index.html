@@ -100,7 +100,10 @@
     <link rel="apple-touch-icon" href="icon.png">
     <link rel="icon" type="image/png" href="icon.png">
 <style id="mobile-cycle-foundation-style">
-#headerCycleControls select{max-width:76px}
+#headerCycleControls{flex-wrap:nowrap;min-width:max-content}
+#headerCycleControls select{box-sizing:border-box}
+#mobileYearSelector{width:78px;min-width:78px;max-width:78px}
+#mobileCropSelector{width:108px;min-width:108px;max-width:108px}
 </style>
 <style id="mobile-feed-cycle-note-style">#mobile-feed-cycle-note{display:inline-flex;align-items:center;margin:.4rem 0 .7rem;padding:.3rem .65rem;border:1px solid #dbeafe;border-radius:999px;background:#eff6ff;color:#1d4ed8;font-size:.7rem;font-weight:700}</style>
 
@@ -340,9 +343,13 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
             <!-- 3. Feed View -->
             <div id="feedView" class="hidden space-y-3">
                 <div class="flex justify-between items-center bg-white p-3 rounded-2xl border border-slate-100 shadow-sm">
-                    <div>
+                    <div class="min-w-0">
                         <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wide">Feed Tracking</h3>
-                        <p class="text-xs text-slate-400" id="currentFeedPondDisplay">Current: Pond P2</p>
+                        <div class="mt-1 flex items-center gap-2">
+                            <label for="feedPondFilter" class="text-[11px] font-semibold text-slate-400">Pond</label>
+                            <select id="feedPondFilter" onchange="changePond(this.value)" class="text-xs font-bold text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-2 py-1 outline-none focus:ring-2 focus:ring-blue-400 min-w-[88px]">
+                            </select>
+                        </div>
                     </div>
                     <button id="feedRecordBtn" onclick="blueCrestOpenFeedRecord()" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-3.5 py-2 rounded-xl shadow-sm transition flex items-center gap-1.5">
                         <span>+</span> Record Feed
@@ -482,18 +489,6 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                 <div id="harvestCardsList" class="space-y-4"></div>
             </div>
 
-        </div>
-
-        <!-- Bottom Action Button Bar -->
-        <div id="bottomActionBar" class="fixed bottom-0 left-0 right-0 bg-white border-t p-3 pb-safe shadow-lg z-40 hidden">
-            <div class="max-w-md mx-auto flex gap-3">
-                <button onclick="alert('Viewing active pond: ' + currentPond)" class="w-1/2 bg-blue-900 text-white py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 text-sm shadow-sm">
-                    <span>🔍</span> Status
-                </button>
-                <button onclick="openModal()" class="w-1/2 bg-blue-600 hover:bg-blue-700 text-white py-2.5 rounded-lg font-medium flex items-center justify-center gap-2 text-sm shadow-sm transition">
-                    <span>+</span> Record Feed
-                </button>
-            </div>
         </div>
 
         <!-- Record Harvest Event Modal (Matches User Screenshot) -->
@@ -856,9 +851,15 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                 </div>
 
                 <form id="feedForm" onsubmit="handleFormSubmit(event)" class="space-y-4 text-sm">
-                    <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Feeding Date *</label>
-                        <input type="date" id="feedingDate" required class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Pond *</label>
+                            <select id="feedPond" required onchange="onFeedPondChange(this.value)" class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500 bg-white font-bold text-xs"></select>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-600 mb-1">Feeding Date *</label>
+                            <input type="date" id="feedingDate" required class="w-full border border-slate-200 p-2.5 rounded-lg outline-none focus:ring-2 focus:ring-blue-500">
+                        </div>
                     </div>
 
                     <div>
@@ -1122,6 +1123,9 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
         let samplingEntries = JSON.parse(localStorage.getItem('bc_sampling')) || [];
         let treatmentEntries = JSON.parse(localStorage.getItem('bc_treatments')) || [];
         let harvestEntries = JSON.parse(localStorage.getItem('bc_harvests')) || [];
+        // Stock transfers are created/managed from the laptop, but the mobile app
+        // must read them so Transfer-in ponds show their actual incoming stock.
+        let stockTransfers = JSON.parse(localStorage.getItem('bc_stockTransfers')) || [];
 
         const treatmentCatalog = {
             'Probiotics': [
@@ -1465,6 +1469,20 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                 renderAllPondsSummary();
             }, err => console.error("Harvest sync error:", err));
 
+            // Stock transfers are written by the laptop and shared through the
+            // same Firestore collection. Mobile is read-only for this module,
+            // but must keep the transfer records in sync for Transfer-in ponds.
+            db.collection('stockTransfers').onSnapshot(snap => {
+                stockTransfers = snap.docs.map(doc => ({
+                    id: doc.id,
+                    ...doc.data()
+                }));
+                localStorage.setItem('bc_stockTransfers', JSON.stringify(stockTransfers));
+                syncPondDropdown();
+                renderPondList();
+                renderAllPondsSummary();
+            }, err => console.error("Stock transfers sync error:", err));
+
             // Finance is global: never filter these records by the active Year + Crop.
             db.collection('vendorTransactions').onSnapshot(snap => {
                 vendorTransactions = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
@@ -1499,13 +1517,26 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
             return `${cycle}__${name}`;
         }
 
+        function logicalPondIdFromRef(ref) {
+            const raw = String(ref || '').trim();
+            if (!raw) return '';
+            const m = raw.match(/^POND_\d{4}_CROP_\d+_(P\d+)$/i);
+            if (m) return m[1].toUpperCase();
+            const m2 = raw.match(/(?:^|[_-])(P\d+)$/i);
+            if (m2) return m2[1].toUpperCase();
+            return raw.toUpperCase();
+        }
+
         function normalizePondRecord(raw, firestoreId = '') {
             const p = { ...(raw || {}) };
             const cycleId = String(
                 p.cycleId ||
                 `${Number(p.year || DEFAULT_CYCLE_YEAR)}|${String(p.crop || DEFAULT_CYCLE_CROP).toLowerCase()}`
             );
-            const id = String(p.id || p.name || p.pondName || firestoreId || '').trim().toUpperCase();
+            // Older pond documents used IDs such as POND_2026_CROP_2_P3.
+            // The operational pond ID is P3; keep the Firestore document ID separately.
+            const suppliedId = p.id || p.name || p.pondName || '';
+            const id = logicalPondIdFromRef(suppliedId || firestoreId);
             return {
                 ...p,
                 id,
@@ -1877,30 +1908,117 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
         }
 
         function getGrowthFromLastSample(targetSample) {
-            const targetCycle = targetSample.cycleId || `${Number(targetSample.year || DEFAULT_CYCLE_YEAR)}|${String(targetSample.crop || DEFAULT_CYCLE_CROP).toLowerCase()}`;
+            // Keep mobile Gain logic aligned with the laptop Sampling logic:
+            // match the same logical pond and cycle, while tolerating legacy
+            // sampling records that may not contain an explicit cycleId.
+            const normalizePondId = (value) => {
+                const raw = String(value || '').trim();
+                const m = raw.match(/(?:^|_)p(\d+)$/i);
+                return m ? `P${m[1]}` : raw.toUpperCase();
+            };
+
+            const targetPond = normalizePondId(
+                targetSample.pond || targetSample.pondId || targetSample.pondName
+            );
+            const targetYear = Number(targetSample.year || targetSample.cropYear || DEFAULT_CYCLE_YEAR);
+            const targetCrop = String(
+                targetSample.crop || targetSample.cropCycle || DEFAULT_CYCLE_CROP
+            ).trim().toLowerCase();
+            const targetCycle = String(
+                targetSample.cycleId ||
+                `${targetYear}|${targetCrop}`
+            ).trim().toLowerCase();
+            const targetId = String(targetSample.id);
+            const targetDate = new Date(`${targetSample.date}T00:00:00`).getTime();
+
             const earlierSamples = samplingEntries
-                .filter(s => s.pond === targetSample.pond && s.id !== targetSample.id)
-                .filter(s => String(s.cycleId || `${Number(s.year || DEFAULT_CYCLE_YEAR)}|${String(s.crop || DEFAULT_CYCLE_CROP).toLowerCase()}`) === String(targetCycle))
+                .filter(s => normalizePondId(s.pond || s.pondId || s.pondName) === targetPond)
                 .filter(s => {
-                    const dateDiff = new Date(targetSample.date + 'T00:00:00') - new Date(s.date + 'T00:00:00');
-                    if (dateDiff > 0) return true;
-                    if (dateDiff === 0) return s.id < targetSample.id;
+                    // If a previous record has an explicit cycle tag, it must
+                    // belong to the same cycle. Legacy records without a cycle
+                    // tag remain eligible when their available year/crop data
+                    // is compatible with the target cycle.
+                    const sYearRaw = s.year || s.cropYear;
+                    const sCropRaw = s.crop || s.cropCycle;
+                    const sCycleRaw = s.cycleId;
+
+                    if (sCycleRaw) {
+                        return String(sCycleRaw).trim().toLowerCase() === targetCycle;
+                    }
+
+                    const sYear = sYearRaw ? Number(sYearRaw) : 0;
+                    const sCrop = sCropRaw ? String(sCropRaw).trim().toLowerCase() : '';
+                    const yearMatches = !sYear || sYear === targetYear;
+                    const cropMatches = !sCrop || sCrop === targetCrop;
+                    return yearMatches && cropMatches;
+                })
+                .filter(s => String(s.id) !== targetId)
+                .filter(s => {
+                    const sampleDate = new Date(`${s.date}T00:00:00`).getTime();
+                    if (sampleDate < targetDate) return true;
+                    if (sampleDate === targetDate) return String(s.id) < targetId;
                     return false;
                 })
-                .sort((a, b) => new Date(b.date + 'T00:00:00') - new Date(a.date + 'T00:00:00') || b.id - a.id);
+                .sort((a, b) => {
+                    const dateDiff =
+                        new Date(`${b.date}T00:00:00`).getTime() -
+                        new Date(`${a.date}T00:00:00`).getTime();
+                    if (dateDiff !== 0) return dateDiff;
+                    return String(b.id).localeCompare(String(a.id), undefined, {numeric:true});
+                });
 
             if (earlierSamples.length === 0) {
+                // First sampling of a Transfer-in pond has no previous sampling
+                // record. In that case the opening biological reference is the
+                // weighted ABW of shrimp actually transferred into this pond.
+                const pond = ponds.find(p => normalizePondId(p?.id || p?.name || p?.pondName) === targetPond);
+                if (pond && isTransferInPond(pond)) {
+                    const transferSummary = getPondTransferInSummary(pond.id, targetSample.date);
+                    const transferAbw = Number(transferSummary?.abw);
+                    const currentAbw = Number(
+                        targetSample.abw != null
+                            ? targetSample.abw
+                            : ((Number(targetSample.sampleWeight || targetSample.testWeight || 0) > 0 &&
+                                Number(targetSample.count || 0) > 0)
+                                ? Number(targetSample.sampleWeight || targetSample.testWeight) / Number(targetSample.count)
+                                : 0)
+                    );
+                    if (Number.isFinite(currentAbw) && currentAbw > 0 &&
+                        Number.isFinite(transferAbw) && transferAbw > 0) {
+                        const diff = currentAbw - transferAbw;
+                        const sign = diff >= 0 ? '+' : '';
+                        return { hasPrev: true, diff, text: `${sign}${diff.toFixed(2)} gm` };
+                    }
+                }
                 return { hasPrev: false, diff: 0, text: '--' };
             }
 
             const prev = earlierSamples[0];
-            const diff = targetSample.abw - prev.abw;
+            const currentWeight = Number(
+                targetSample.abw != null
+                    ? targetSample.abw
+                    : ((Number(targetSample.sampleWeight || targetSample.testWeight || 0) > 0 &&
+                        Number(targetSample.count || 0) > 0)
+                        ? Number(targetSample.sampleWeight || targetSample.testWeight) / Number(targetSample.count)
+                        : 0)
+            );
+            const previousWeight = Number(
+                prev.abw != null
+                    ? prev.abw
+                    : ((Number(prev.sampleWeight || prev.testWeight || 0) > 0 &&
+                        Number(prev.count || 0) > 0)
+                        ? Number(prev.sampleWeight || prev.testWeight) / Number(prev.count)
+                        : 0)
+            );
+
+            if (!Number.isFinite(currentWeight) || !Number.isFinite(previousWeight) ||
+                currentWeight <= 0 || previousWeight <= 0) {
+                return { hasPrev: false, diff: 0, text: '--' };
+            }
+
+            const diff = currentWeight - previousWeight;
             const sign = diff >= 0 ? '+' : '';
-            return {
-                hasPrev: true,
-                diff: diff,
-                text: `${sign}${diff.toFixed(2)} gm`
-            };
+            return { hasPrev: true, diff, text: `${sign}${diff.toFixed(2)} gm` };
         }
 
         function getLatestCumulativeForPond(pondId, excludeSampleId = null) {
@@ -1966,6 +2084,8 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
 
         function syncPondDropdown() {
             const selector = document.getElementById('pondSelector');
+            const feedPondSelect = document.getElementById('feedPond');
+            const feedPondFilter = document.getElementById('feedPondFilter');
             const samplingPondSelect = document.getElementById('samplingPond');
             const samplingFilterSelect = document.getElementById('samplingPondFilterSelect');
             const treatmentPondSelect = document.getElementById('treatmentPond');
@@ -1974,6 +2094,8 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
             const harvestFilterSelect = document.getElementById('harvestPondFilterSelect');
             
             selector.innerHTML = '';
+            if (feedPondSelect) feedPondSelect.innerHTML = '';
+            if (feedPondFilter) feedPondFilter.innerHTML = '';
             if (samplingPondSelect) samplingPondSelect.innerHTML = '';
             if (treatmentPondSelect) treatmentPondSelect.innerHTML = '';
             if (harvestPondSelect) harvestPondSelect.innerHTML = '';
@@ -1999,9 +2121,23 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
             activePonds.forEach(p => {
                 const opt = document.createElement('option');
                 opt.value = p.id;
-                opt.innerText = p.id;
+                opt.innerText = logicalPondIdFromRef(p.id);
                 if (p.id === currentPond) opt.selected = true;
                 selector.appendChild(opt);
+
+                if (feedPondSelect) {
+                    const fOpt = document.createElement('option');
+                    fOpt.value = p.id;
+                    fOpt.innerText = logicalPondIdFromRef(p.id);
+                    feedPondSelect.appendChild(fOpt);
+                }
+                if (feedPondFilter) {
+                    const ffOpt = document.createElement('option');
+                    ffOpt.value = p.id;
+                    ffOpt.innerText = logicalPondIdFromRef(p.id);
+                    if (p.id === currentPond) ffOpt.selected = true;
+                    feedPondFilter.appendChild(ffOpt);
+                }
 
                 if (samplingPondSelect) {
                     const sOpt = document.createElement('option');
@@ -2106,8 +2242,8 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                 bottomBar.classList.remove('hidden');
                 headerPondSection.classList.remove('hidden');
                 headerHomeTitle.classList.add('hidden');
-                const pondDisplay = document.getElementById('currentFeedPondDisplay');
-                if (pondDisplay) pondDisplay.innerText = `Current: Pond ${currentPond}`;
+                const feedPondFilter = document.getElementById('feedPondFilter');
+                if (feedPondFilter) feedPondFilter.value = currentPond || '';
                 renderHistory();
             } else {
                 bottomBar.classList.add('hidden');
@@ -2134,10 +2270,27 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
             });
         }
 
+        function onFeedPondChange(pond) {
+            const c = getActiveCycle();
+            const activePonds = getActivePonds();
+            if (!activePonds.some(p => p.id === pond)) return;
+            const selected = activePonds.find(p => p.id === pond);
+            const subtitle = document.getElementById('modalSubtitle');
+            if (subtitle) subtitle.innerText = `Farm: Elite Aqualines ${c.year} ${c.crop} | ${selected?.id || pond}`;
+            const feedPondFilter = document.getElementById('feedPondFilter');
+            if (feedPondFilter) feedPondFilter.value = pond;
+        }
+
         function changePond(pond) {
+            const activePonds = getActivePonds();
+            if (!activePonds.some(p => p.id === pond)) return;
             currentPond = pond;
+            const feedPondFilter = document.getElementById('feedPondFilter');
+            if (feedPondFilter) feedPondFilter.value = currentPond;
+            const headerSelector = document.getElementById('pondSelector');
+            if (headerSelector) headerSelector.value = currentPond;
             const pondDisplay = document.getElementById('currentFeedPondDisplay');
-            if (pondDisplay) pondDisplay.innerText = `Current: Pond ${currentPond}`;
+            if (pondDisplay) pondDisplay.innerText = `Current: Pond ${logicalPondIdFromRef(currentPond)}`;
             renderHistory();
         }
 
@@ -2238,6 +2391,12 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                     .reduce((acc, curr) => acc + (curr.fasting ? 0 : (parseFloat(curr.qty) || 0)), 0);
 
                 const doc = calculateDOC(pond.stockingDate, latestSystemDate);
+                const transferIn = isTransferInPond(pond);
+                const transferSummary = transferIn ? getPondTransferInSummary(pond.id) : null;
+                const stockLabel = transferIn ? 'Transferred In' : 'Stocked';
+                const stockNumber = transferIn
+                    ? (transferSummary.number > 0 ? transferSummary.number.toLocaleString() : '0')
+                    : (pond.stockingCount ? pond.stockingCount.toLocaleString() : '0');
 
                 const card = document.createElement('div');
                 card.className = 'bg-white p-5 rounded-2xl shadow-sm border border-slate-100 space-y-3';
@@ -2246,6 +2405,7 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                         <div>
                             <h3 class="text-sm font-bold text-slate-800 uppercase tracking-wide">${pondId} DASHBOARD SUMMARY</h3>
                             <p class="text-xs text-slate-400 font-medium mt-0.5">${formattedDate}</p>
+                            <p class="text-xs text-slate-500 font-semibold mt-1">${stockLabel}: ${stockNumber} ${transferIn ? 'pcs' : 'PL'}</p>
                         </div>
                         <span class="text-lg font-black text-emerald-600">DOC ${doc}</span>
                     </div>
@@ -2265,6 +2425,40 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
             updateHeaderDate();
         }
 
+        function getPondTransferInSummary(pondId, asOfDate = null) {
+            const moves = Array.isArray(stockTransfers) ? stockTransfers : [];
+            const pond = ponds.find(p => String(p.id) === String(pondId));
+            const pYear = pond ? Number(pond.year || 0) : 0;
+            const pCrop = pond ? String(pond.crop || '').trim().toLowerCase() : '';
+            const targetId = logicalPondIdFromRef(pondId);
+            const matching = moves.filter(t => {
+                const toRaw = t.toPondId || t.toPond || '';
+                const toId = logicalPondIdFromRef(toRaw);
+                const year = Number(t.year || t.cropYear || 0);
+                const crop = String(t.crop || t.cropCycle || '').trim().toLowerCase();
+                const transferDate = String(t.date || '').trim();
+                const dateMatches = !asOfDate || !transferDate || transferDate <= String(asOfDate);
+                return toId === targetId
+                    && (!year || !pYear || year === pYear)
+                    && (!crop || !pCrop || crop === pCrop)
+                    && dateMatches;
+            });
+            const number = matching.reduce((sum, t) => sum + Number(t.number ?? t.transferredNumber ?? t.count ?? 0), 0);
+            const biomass = matching.reduce((sum, t) => sum + Number(t.biomass ?? t.transferredBiomass ?? 0), 0);
+            return {
+                number,
+                biomass,
+                // Transfer-in opening ABW is derived from the actual stock
+                // transferred into this pond: biomass (kg) × 1000 ÷ pieces.
+                abw: number > 0 && biomass > 0 ? (biomass * 1000) / number : null
+            };
+        }
+
+        function isTransferInPond(pond) {
+            const type = String(pond?.pondType || pond?.type || '').trim().toLowerCase();
+            return type === 'transferin' || type === 'transfer-in';
+        }
+
         function renderPondList() {
             const container = document.getElementById('pondCardsList');
             const totalCountEl = document.getElementById('totalPondsCount');
@@ -2276,6 +2470,13 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
             const activePonds = getActivePonds();
             activePonds.forEach(p => {
                 const doc = calculateDOC(p.stockingDate, latestSystemDate);
+                const transferIn = isTransferInPond(p);
+                const transferSummary = transferIn ? getPondTransferInSummary(p.id) : null;
+                const stockLabel = transferIn ? 'Transferred In' : 'Stocking Count';
+                const stockNumber = transferIn
+                    ? (transferSummary.number > 0 ? transferSummary.number.toLocaleString() : '0')
+                    : (p.stockingCount ? p.stockingCount.toLocaleString() : '0');
+                const stockUnit = transferIn ? 'pcs' : 'PL';
                 const card = document.createElement('div');
                 card.className = 'bg-white p-4 rounded-2xl border border-slate-100 shadow-sm space-y-2.5';
                 card.innerHTML = `
@@ -2298,8 +2499,8 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                             <span class="font-bold text-slate-700">${formatDateDisplay(p.stockingDate)}</span>
                         </div>
                         <div class="bg-slate-50 p-2 rounded-xl">
-                            <span class="text-slate-400 block text-[11px]">Stocking Count</span>
-                            <span class="font-bold text-slate-700">${p.stockingCount ? p.stockingCount.toLocaleString() : 0} PL</span>
+                            <span class="text-slate-400 block text-[11px]">${stockLabel}</span>
+                            <span class="font-bold text-slate-700">${stockNumber} ${stockUnit}</span>
                         </div>
                     </div>
                 `;
@@ -2323,8 +2524,13 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
 
             dates.forEach(dateStr => {
                 const dateHeader = document.createElement('div');
-                dateHeader.className = 'text-xs font-bold text-slate-500 bg-slate-100 p-2 rounded mt-3 mb-2';
-                dateHeader.innerText = `(${currentPond}) ${dateStr}`;
+                dateHeader.className = 'flex items-center gap-2 text-xs font-bold text-slate-500 bg-slate-100 p-2 rounded mt-3 mb-2';
+                const pondForDate = getActivePonds().find(p => p.id === currentPond);
+                const dateDoc = pondForDate ? calculateDOC(pondForDate.stockingDate, dateStr) : '-';
+                dateHeader.innerHTML = `
+                    <span>(${currentPond}) ${dateStr}</span>
+                    <span class="text-[10px] font-black text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded">DOC ${dateDoc}</span>
+                `;
                 container.appendChild(dateHeader);
 
                 const entriesForDate = pondEntries.filter(e => e.date === dateStr);
@@ -2371,7 +2577,7 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                         </div>
                         <div class="w-5 pt-1 text-center text-blue-500">${entry.notes ? '💬' : ''}</div>
                         <div class="w-14 pt-1 flex items-center justify-end gap-2 pr-1">
-                            <button onclick='openModal(${JSON.stringify(String(entry.id))})' class="text-slate-500 hover:text-blue-600 transition">✏️</button>
+                            <button onclick='blueCrestEditFeed(${JSON.stringify(String(entry.id))})' class="text-slate-500 hover:text-blue-600 transition">✏️</button>
                             <button onclick='deleteFeed(${JSON.stringify(String(entry.id))})' class="text-slate-400 hover:text-rose-600 transition text-sm">🗑️</button>
                         </div>
                     `;
@@ -2432,10 +2638,10 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                     const doc = pondObj ? calculateDOC(pondObj.stockingDate, item.date) : '-';
                     const growthInfo = getGrowthFromLastSample(item);
 
-                    let growthHtml = `<div class="bg-slate-50 p-2 rounded-xl border border-slate-100"><span class="text-[10px] text-slate-400 font-medium block">Growth</span><span class="font-bold text-slate-400 text-xs">--</span></div>`;
+                    let growthHtml = `<div class="bg-slate-50 p-2 rounded-xl border border-slate-100"><span class="text-[10px] text-slate-400 font-medium block">Gain</span><span class="font-bold text-slate-400 text-xs">--</span></div>`;
                     if (growthInfo.hasPrev) {
                         const isGain = growthInfo.diff >= 0;
-                        growthHtml = `<div class="${isGain ? 'bg-blue-50/70 border-blue-100 text-blue-700' : 'bg-rose-50 border-rose-100 text-rose-700'} p-2 rounded-xl border"><span class="text-[10px] block font-semibold">Growth</span><span class="font-extrabold text-xs">${growthInfo.text}</span></div>`;
+                        growthHtml = `<div class="${isGain ? 'bg-blue-50/70 border-blue-100 text-blue-700' : 'bg-rose-50 border-rose-100 text-rose-700'} p-2 rounded-xl border"><span class="text-[10px] block font-semibold">Gain</span><span class="font-extrabold text-xs">${growthInfo.text}</span></div>`;
                     }
 
                     const netFeedVal = item.netFeed !== undefined 
@@ -2451,7 +2657,7 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                                 <span class="text-[11px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded">DOC ${doc}</span>
                             </div>
                             <div class="flex items-center gap-2">
-                                <button onclick=\'openSamplingModal(${JSON.stringify(String(item.id))})\' class="text-slate-500 hover:text-blue-600 transition">✏️</button>
+                                <button onclick=\'blueCrestEditSampling(${JSON.stringify(String(item.id))})\' class="text-slate-500 hover:text-blue-600 transition">✏️</button>
                                 <button onclick=\'deleteSampling(${JSON.stringify(String(item.id))})\' class="text-slate-400 hover:text-rose-600 transition text-sm">🗑️</button>
                             </div>
                         </div>
@@ -2546,7 +2752,7 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                                 <span class="text-[11px] font-semibold text-purple-700 bg-purple-50 border border-purple-100 px-2 py-0.5 rounded truncate max-w-[120px]">${item.purpose}</span>
                             </div>
                             <div class="flex items-center gap-2">
-                                <button type="button" onclick=\'openTreatmentModal(${JSON.stringify(String(item.id))})\' class="text-slate-500 hover:text-blue-600 transition">✏️</button>
+                                <button type="button" onclick=\'blueCrestEditTreatment(${JSON.stringify(String(item.id))})\' class="text-slate-500 hover:text-blue-600 transition">✏️</button>
                                 <button type="button" onclick=\'deleteTreatment(${JSON.stringify(String(item.id))})\' class="text-slate-400 hover:text-rose-600 transition text-sm">🗑️</button>
                             </div>
                         </div>
@@ -2632,7 +2838,7 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                                 <span class="text-[11px] font-extrabold border px-2 py-0.5 rounded ${isFinal ? 'bg-rose-50 text-rose-700 border-rose-200' : 'bg-amber-50 text-amber-700 border-amber-200'}">${item.type}</span>
                             </div>
                             <div class="flex items-center gap-2">
-                                <button onclick=\'openHarvestModal(${JSON.stringify(String(item.id))})\' class="text-slate-500 hover:text-blue-600 transition">✏️</button>
+                                <button onclick=\'blueCrestEditHarvest(${JSON.stringify(String(item.id))})\' class="text-slate-500 hover:text-blue-600 transition">✏️</button>
                                 <button onclick=\'deleteHarvest(${JSON.stringify(String(item.id))})\' class="text-slate-400 hover:text-rose-600 transition text-sm">🗑️</button>
                             </div>
                         </div>
@@ -2814,6 +3020,7 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
         function handleFormSubmit(e) {
             if (isViewOnlyMode) { e.preventDefault(); alert('View-Only mode: data changes are disabled.'); return; }
             e.preventDefault();
+            const pond = document.getElementById('feedPond').value;
             const date = document.getElementById('feedingDate').value;
             const time = document.getElementById('selectedTimeString').innerText;
             const fasting = document.querySelector('input[name="fasting"][value="Yes"]').checked;
@@ -2847,17 +3054,24 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
 
             const c = getActiveCycle();
             const activePonds = getActivePonds();
-            if (!currentPond || !activePonds.some(p => p.id === currentPond)) {
+            if (!pond || !activePonds.some(p => p.id === pond)) {
                 alert(`Please select a pond from ${c.year} • ${c.crop}.`);
                 return;
             }
+            if (typeof blueCrestAssertOperationalWrite === 'function' &&
+                !blueCrestAssertOperationalWrite({pondId: pond, cycleId: c.id})) {
+                return;
+            }
+
+            // Keep the feed screen focused on the pond actually selected for this entry.
+            currentPond = pond;
 
             const id = editingEntryId !== null ? editingEntryId : Date.now();
             const existing = editingEntryId !== null ? feedEntries.find(e => e.id === editingEntryId) : null;
             const entryObj = {
                 ...(existing || {}),
                 id,
-                pond: currentPond,
+                pond,
                 year: Number(c.year),
                 crop: c.crop,
                 cycleId: c.id,
@@ -3552,19 +3766,24 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
         }
 
         function openModal(id = null) {
+            syncPondDropdown();
+            const feedPondSelect = document.getElementById('feedPond');
             document.getElementById('feedModal').classList.remove('hidden');
             const modalTitle = document.getElementById('modalTitleText');
-            document.getElementById('modalSubtitle').innerText = `Farm: Elite Aqualines 2026 C2 | ${currentPond}`;
+            document.getElementById('modalSubtitle').innerText = `Farm: Elite Aqualines ${getActiveCycle().year} ${getActiveCycle().crop} | ${currentPond}`;
 
             if (id !== null) {
                 editingEntryId = id;
-                modalTitle.innerText = `Edit Feed Data (${currentPond})`;
                 const entry = getActiveFeedEntries().find(e =>
                     String(e.id) === String(id) ||
                     String(e.firestoreId || '') === String(id) ||
                     String(e.legacyRecordId || '') === String(id)
                 );
                 if (entry) {
+                    const entryPond = String(entry.pond || currentPond || '');
+                    if (feedPondSelect) feedPondSelect.value = entryPond;
+                    onFeedPondChange(entryPond);
+                    modalTitle.innerText = `Edit Feed Data (${entryPond})`;
                     document.getElementById('feedingDate').value = entry.date;
                     const parts = entry.time.split(' ');
                     const hm = parts[0].split(':');
@@ -3597,7 +3816,10 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                 }
             } else {
                 editingEntryId = null;
-                modalTitle.innerText = `Add Feed Data (${currentPond})`;
+                const selectedPond = currentPond || (getActivePonds().length ? getActivePonds()[0].id : '');
+                if (feedPondSelect) feedPondSelect.value = selectedPond;
+                onFeedPondChange(selectedPond);
+                modalTitle.innerText = `Add Feed Data (${selectedPond})`;
                 const now = new Date();
                 document.getElementById('feedingDate').value = now.toISOString().split('T')[0];
                 selectedHour = now.getHours();
@@ -3740,8 +3962,35 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
         }
 
         function toggleFasting(isFasting) {
-            document.getElementById('feedProductsSection').style.display = isFasting ? 'none' : 'block';
-            document.getElementById('supplementProductsSection').style.display = isFasting ? 'none' : 'block';
+            const feedSection = document.getElementById('feedProductsSection');
+            const supplementSection = document.getElementById('supplementProductsSection');
+            if (feedSection) feedSection.style.display = isFasting ? 'none' : 'block';
+            if (supplementSection) supplementSection.style.display = isFasting ? 'none' : 'block';
+
+            // Hidden feed/supplement controls must not participate in browser
+            // validation. Otherwise a Fasting=Yes entry is blocked because the
+            // hidden feed row still contains required inputs.
+            document.querySelectorAll('#feedProductsSection input, #feedProductsSection select').forEach(el => {
+                if (isFasting) {
+                    el.dataset.fastingRequired = el.required ? '1' : '0';
+                    el.required = false;
+                    el.disabled = true;
+                } else {
+                    el.disabled = false;
+                    if (el.dataset.fastingRequired === '1') el.required = true;
+                    delete el.dataset.fastingRequired;
+                }
+            });
+
+            document.querySelectorAll('#supplementProductsSection input, #supplementProductsSection select').forEach(el => {
+                if (isFasting) {
+                    el.dataset.fastingDisabled = '1';
+                    el.disabled = true;
+                } else {
+                    el.disabled = false;
+                    delete el.dataset.fastingDisabled;
+                }
+            });
         }
 
         function openClockPicker() { document.getElementById('clockModal').classList.remove('hidden'); switchClockMode('hour'); }
@@ -3842,6 +4091,70 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
         });
 
     </script>
+
+<script id="bluecrest-final-entry-edit-delete-lock">
+(function(){
+  if (typeof window === 'undefined') return;
+  function findRecord(arr, id){
+    if (!Array.isArray(arr)) return null;
+    return arr.find(x => String(x?.id ?? '') === String(id) || String(x?.firestoreId ?? '') === String(id) || String(x?.legacyRecordId ?? '') === String(id)) || null;
+  }
+  function cycleForRecord(r){
+    try { return typeof cycleOf === 'function' ? cycleOf(r) : (r?.cycleId || `${Number(r?.year||0)}|${String(r?.crop||'').toLowerCase()}`); }
+    catch(e){ return r?.cycleId || ''; }
+  }
+  function guardExistingEntry(r, label){
+    if (!r) return true;
+    const cId = cycleForRecord(r);
+    try {
+      if (typeof isCropClosed === 'function' && isCropClosed(cId)) {
+        alert(`🔒 Crop Closed\n\nThis ${label} belongs to a closed crop. Editing or deleting production records is not allowed until the crop is reactivated from the laptop.`);
+        return false;
+      }
+      const pid = r.pondId ?? r.pond ?? r.pondName ?? '';
+      if (pid && typeof isPondClosed === 'function' && isPondClosed(pid, cId)) {
+        alert(`🔒 Pond Closed\n\nPond ${r.pondName || pid} is closed after Full/Final Harvest. Editing or deleting this ${label} is not allowed until the pond is reactivated from the laptop.`);
+        return false;
+      }
+    } catch(e) { console.warn('Entry lock guard:', e); }
+    return true;
+  }
+  function wrapGlobal(name, resolver, label){
+    const original = window[name];
+    if (typeof original !== 'function' || original.__bcFinalLockWrapped) return;
+    const wrapped = function(id){
+      const r = resolver(id);
+      if (!guardExistingEntry(r,label)) return;
+      return original.apply(this, arguments);
+    };
+    wrapped.__bcFinalLockWrapped = true;
+    window[name] = wrapped;
+  }
+  function setup(){
+    const getFeed = id => findRecord(typeof feedEntries!=='undefined'?feedEntries:[], id);
+    const getSample = id => findRecord(typeof samplingEntries!=='undefined'?samplingEntries:(typeof samples!=='undefined'?samples:[]), id);
+    const getTreatment = id => findRecord(typeof treatmentEntries!=='undefined'?treatmentEntries:(typeof treatments!=='undefined'?treatments:[]), id);
+    const getHarvest = id => findRecord(typeof harvestEntries!=='undefined'?harvestEntries:(typeof harvests!=='undefined'?harvests:[]), id);
+
+    // Edit modal entry points: block BEFORE any modal can be opened.
+    wrapGlobal('openModal', getFeed, 'feed record');
+    wrapGlobal('openSamplingModal', getSample, 'sampling entry');
+    wrapGlobal('openTreatmentModal', getTreatment, 'treatment entry');
+    wrapGlobal('openHarvestModal', getHarvest, 'harvest entry');
+
+    // Delete entry points: block BEFORE confirmation/deletion can start.
+    wrapGlobal('deleteFeed', getFeed, 'feed record');
+    wrapGlobal('deleteSampling', getSample, 'sampling entry');
+    wrapGlobal('deleteTreatment', getTreatment, 'treatment entry');
+    wrapGlobal('deleteHarvest', getHarvest, 'harvest entry');
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', setup, {once:true});
+  else setup();
+  setTimeout(setup, 500);
+  setTimeout(setup, 1500);
+})();
+</script>
+
 </body>
 </html>
 
@@ -3883,8 +4196,7 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
     const arr=typeof ponds!=='undefined'&&Array.isArray(ponds)?ponds:[];
     return arr.filter(p=>{
       const pc=String(p.cycleId || (typeof cycleIdFor==='function'?cycleIdFor(p.year||p.cropYear,p.crop||p.cropCycle):''));
-      const t=String(p.pondType||p.type||'').trim().toLowerCase();
-      return pc===String(c.id) && ['growout','grow-out','transferin','transfer-in'].includes(t);
+      return pc===String(c.id);
     });
   }
   function hasFullHarvest(p){
@@ -3914,7 +4226,7 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
     const rel=relevantPonds(c);
     if(rel.length && rel.every(x=>isPondClosed(x.id,cid)||hasFullHarvest(x)) && !isCropClosed(cid)){
       for(const x of rel) if(!isPondClosed(x.id,cid)) await closePond(x,'Full/Final harvest recorded');
-      if(rel.every(x=>isPondClosed(x.id,cid))){ await closeCrop(c,'All relevant Grow-out/Transfer-in ponds completed Full/Final Harvest'); await writeAudit('CROP_CLOSED',c,'All relevant Grow-out/Transfer-in ponds completed Full/Final Harvest'); }
+      if(rel.every(x=>isPondClosed(x.id,cid))){ await closeCrop(c,'All ponds completed Full/Final Harvest'); await writeAudit('CROP_CLOSED',c,'All ponds completed Full/Final Harvest'); }
     }
     renderLockStatus(); refreshMobileRecordButtons();
   }
@@ -3939,7 +4251,7 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
       (closed?`<button type="button" id="bcReactivateCrop" style="border:0;border-radius:7px;padding:5px 8px;background:#b91c1c;color:#fff;font-size:11px;font-weight:800;cursor:pointer">Reactivate Crop</button>`:`<button type="button" id="bcCloseCrop" ${rel.length&&done===rel.length?'':'disabled'} style="border:0;border-radius:7px;padding:5px 8px;background:#2563eb;color:#fff;font-size:11px;font-weight:800;cursor:pointer;opacity:${rel.length&&done===rel.length?'1':'.45'}">Close Crop</button>`)+
       `<button type="button" id="bcManagePondLocks" style="border:0;border-radius:7px;padding:5px 8px;background:#475569;color:#fff;font-size:11px;font-weight:800;cursor:pointer">Pond Locks</button>`;
       document.getElementById('bcCloseCrop')?.addEventListener('click',async()=>{
-        if(!rel.length||!rel.every(p=>isPondClosed(p.id,c.id)||hasFullHarvest(p))){alert('Complete Full/Final Harvest for every Grow-out and Transfer-in pond first.');return;}
+        if(!rel.length||!rel.every(p=>isPondClosed(p.id,c.id)||hasFullHarvest(p))){alert('Complete Full/Final Harvest for every pond in this crop first.');return;}
         try{for(const p of rel)if(!isPondClosed(p.id,c.id))await closePond(p,'Closed after Full/Final Harvest');await closeCrop(c,'Closed after all relevant ponds completed Full/Final Harvest');await writeAudit('CROP_CLOSED',c,'Closed after all relevant ponds completed Full/Final Harvest');renderLockStatus();}catch(e){console.error(e);alert('Crop could not be closed. Check cloud connection.');}
       });
       document.getElementById('bcReactivateCrop')?.addEventListener('click',async()=>{
@@ -3951,7 +4263,7 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
     }
   }
   async function managePonds(c,rel){
-    if(!rel.length){alert('No Grow-out or Transfer-in ponds in this crop.');return;}
+    if(!rel.length){alert('No ponds in this crop.');return;}
     const list=rel.map((p,i)=>`${i+1}. ${p.name||p.id} — ${isPondClosed(p.id,c.id)?'🔒 Closed':'🔓 Open'}`).join('\n');
     const n=Number(prompt(`Pond Locks — ${c.year} • ${c.crop}\n\n${list}\n\nEnter pond number:`,''))-1;
     const p=rel[n]; if(!p)return;
@@ -4048,24 +4360,23 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
     const cropBlocked=isCropClosed(c.id);
     const feedBtn=document.getElementById('feedRecordBtn');
     if(feedBtn) styleRecordButton(feedBtn,recordButtonState(typeof currentPond!=='undefined'?currentPond:''));
+    const getRecordStateForFilter = (filterId) => {
+      const filter=document.getElementById(filterId)?.value||'ALL';
+      // IMPORTANT: All Ponds means "choose any open pond", not "use currentPond".
+      // A closed currentPond must never disable the Record button when another open pond exists.
+      if(filter==='ALL'){
+        const openPond=getOpenPondForAllPonds();
+        if(openPond) return {blocked:false,msg:''};
+        return recordButtonState('');
+      }
+      return recordButtonState(filter);
+    };
     const sampleBtn=document.getElementById('samplingRecordBtn');
-    if(sampleBtn){
-      const filter=document.getElementById('samplingPondFilterSelect')?.value||'ALL';
-      const pid=filter==='ALL'?(typeof currentPond!=='undefined'?currentPond:''):filter;
-      styleRecordButton(sampleBtn,recordButtonState(pid));
-    }
+    if(sampleBtn) styleRecordButton(sampleBtn,getRecordStateForFilter('samplingPondFilterSelect'));
     const treatBtn=document.getElementById('treatmentRecordBtn');
-    if(treatBtn){
-      const filter=document.getElementById('treatmentPondFilterSelect')?.value||'ALL';
-      const pid=filter==='ALL'?(typeof currentPond!=='undefined'?currentPond:''):filter;
-      styleRecordButton(treatBtn,recordButtonState(pid));
-    }
+    if(treatBtn) styleRecordButton(treatBtn,getRecordStateForFilter('treatmentPondFilterSelect'));
     const harvestBtn=document.getElementById('harvestRecordBtn');
-    if(harvestBtn){
-      const filter=document.getElementById('harvestPondFilterSelect')?.value||'ALL';
-      const pid=filter==='ALL'?(typeof currentPond!=='undefined'?currentPond:''):filter;
-      styleRecordButton(harvestBtn,recordButtonState(pid));
-    }
+    if(harvestBtn) styleRecordButton(harvestBtn,getRecordStateForFilter('harvestPondFilterSelect'));
     const pondBtn=document.querySelector('#pondView button[onclick="openPondModal()"]');
     if(pondBtn) styleRecordButton(pondBtn,{blocked:cropBlocked,msg:`🔒 Crop Closed\n\n${c.year} • ${c.crop} is closed. Pond setup changes are locked until the crop is reactivated from the laptop.`});
   }
@@ -4088,6 +4399,56 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
       return originalOpenPondModal.apply(this, arguments);
     };
   }
+  // Definitive protection for EDIT buttons: history cards call the modal functions
+  // directly (openModal/openSamplingModal/openTreatmentModal/openHarvestModal),
+  // so wrapping editSample/editTreatment/etc. alone is not sufficient.
+  function blueCrestEditEntry(type,id,modalFn,arrName){
+    // Top-level `let` datasets are lexical bindings, not window properties.
+    // Use the real in-page arrays directly so Edit works for existing records.
+    const arr = type === 'feed' ? feedEntries
+      : type === 'sampling' ? samplingEntries
+      : type === 'treatment' ? treatmentEntries
+      : type === 'harvest' ? harvestEntries
+      : [];
+    const rec=arr.find(x=>String(x.id)===String(id)||String(x.firestoreId||'')===String(id)||String(x.legacyRecordId||'')===String(id));
+    if(!rec){ alert('Entry could not be found.'); return; }
+    const pid=pondIdOf(rec);
+    const cid=cycleOf(rec)||activeC().id;
+    if(!window.blueCrestAssertOperationalWrite({pondId:pid,cycleId:cid})) return;
+    return modalFn(String(id));
+  }
+  window.blueCrestEditFeed=function(id){ return blueCrestEditEntry('feed',id,openModal,'feedEntries'); };
+  window.blueCrestEditSampling=function(id){ return blueCrestEditEntry('sampling',id,openSamplingModal,'samplingEntries'); };
+  window.blueCrestEditTreatment=function(id){ return blueCrestEditEntry('treatment',id,openTreatmentModal,'treatmentEntries'); };
+  window.blueCrestEditHarvest=function(id){ return blueCrestEditEntry('harvest',id,openHarvestModal,'harvestEntries'); };
+
+  function installEntryEditModalLocks(){
+    const specs=[
+      ['openModal','feedEntries'],
+      ['openSamplingModal','samplingEntries'],
+      ['openTreatmentModal','treatmentEntries'],
+      ['openHarvestModal','harvestEntries']
+    ];
+    specs.forEach(([name,arrName])=>{
+      const key='__bcEntryEditWrapped_'+name;
+      if(window[key] || typeof window[name]!=='function') return;
+      const original=window[name];
+      window[key]=true;
+      window[name]=function(id=null){
+        if(id!==null && id!==undefined && String(id).trim()!==''){
+          const arr=Array.isArray(window[arrName])?window[arrName]:[];
+          const rec=arr.find(x=>String(x.id)===String(id)||String(x.firestoreId||'')===String(id)||String(x.legacyRecordId||'')===String(id));
+          if(rec){
+            const pid=pondIdOf(rec);
+            const cid=cycleOf(rec)||activeC().id;
+            if(!window.blueCrestAssertOperationalWrite({pondId:pid,cycleId:cid})) return;
+          }
+        }
+        return original.apply(this,arguments);
+      };
+    });
+  }
+
   function blueCrestEntryGuard(pondId){
     const state=recordButtonState(pondId);
     if(state.blocked){ alert(state.msg); refreshMobileRecordButtons(); return false; }
@@ -4098,23 +4459,44 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
     if(!blueCrestEntryGuard(pid)) return;
     return openModal();
   };
-  window.blueCrestOpenSamplingRecord=function(){
-    const filter=document.getElementById('samplingPondFilterSelect')?.value||'ALL';
-    const pid=filter==='ALL'?(typeof currentPond!=='undefined'?currentPond:''):filter;
+  function getOpenPondForAllPonds(){
+    const c=activeC();
+    const arr=typeof getActivePonds==='function' ? getActivePonds() : (typeof ponds!=='undefined'&&Array.isArray(ponds)?ponds:[]);
+    return arr.find(p=>{
+      const pc=String(p.cycleId || cycleOf(p) || c.id);
+      return pc===String(c.id) && !isPondClosed(p.id,c.id);
+    }) || null;
+  }
+  function openRecordWithPond(filterId, modalFn, formPondId, label){
+    const filter=document.getElementById(filterId)?.value||'ALL';
+    let pid=filter==='ALL' ? '' : filter;
+    if(filter==='ALL'){
+      const openPond=getOpenPondForAllPonds();
+      if(!openPond){
+        const c=activeC();
+        if(isCropClosed(c.id)){
+          alert(`🔒 Crop Closed\n\n${c.year} • ${c.crop} is closed. No new ${label} can be recorded until the crop is reactivated from the laptop.`);
+        }else{
+          alert(`🔒 All Ponds Closed\n\nThere are no open ponds available for new ${label}.`);
+        }
+        return;
+      }
+      pid=String(openPond.id);
+    }
     if(!blueCrestEntryGuard(pid)) return;
-    return openSamplingModal();
+    const result=modalFn();
+    const field=document.getElementById(formPondId);
+    if(field && pid) field.value=pid;
+    return result;
+  }
+  window.blueCrestOpenSamplingRecord=function(){
+    return openRecordWithPond('samplingPondFilterSelect',openSamplingModal,'samplingPond','sampling');
   };
   window.blueCrestOpenTreatmentRecord=function(){
-    const filter=document.getElementById('treatmentPondFilterSelect')?.value||'ALL';
-    const pid=filter==='ALL'?(typeof currentPond!=='undefined'?currentPond:''):filter;
-    if(!blueCrestEntryGuard(pid)) return;
-    return openTreatmentModal();
+    return openRecordWithPond('treatmentPondFilterSelect',openTreatmentModal,'treatmentPond','treatment');
   };
   window.blueCrestOpenHarvestRecord=function(){
-    const filter=document.getElementById('harvestPondFilterSelect')?.value||'ALL';
-    const pid=filter==='ALL'?(typeof currentPond!=='undefined'?currentPond:''):filter;
-    if(!blueCrestEntryGuard(pid)) return;
-    return openHarvestModal();
+    return openRecordWithPond('harvestPondFilterSelect',openHarvestModal,'harvestPond','harvest');
   };
   function installRecordButtonLockUI(){
     if(DEVICE!=='mobile'||window.__bcRecordButtonLockUIInstalled)return;
@@ -4123,11 +4505,13 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
       const btn=e.target?.closest?.('[data-bc-lock-record-button="1"]');
       if(!btn||btn.dataset.bcLockDisabled!=='1') return;
       e.preventDefault(); e.stopImmediatePropagation();
-      const pondId=btn.closest('#samplingView')?document.getElementById('samplingPondFilterSelect')?.value:
-        btn.closest('#treatmentView')?document.getElementById('treatmentPondFilterSelect')?.value:
-        btn.closest('#harvestView')?document.getElementById('harvestPondFilterSelect')?.value:
-        btn.closest('#feedView')?(typeof currentPond!=='undefined'?currentPond:''):'';
-      const state=recordButtonState(pondId==='ALL'?'':pondId);
+      const filterId=btn.closest('#samplingView')?'samplingPondFilterSelect':
+        btn.closest('#treatmentView')?'treatmentPondFilterSelect':
+        btn.closest('#harvestView')?'harvestPondFilterSelect':null;
+      const filter=filterId?document.getElementById(filterId)?.value||'ALL':'';
+      const state=(filter==='ALL' && filterId) ?
+        (getOpenPondForAllPonds()?{blocked:false,msg:''}:recordButtonState('')) :
+        recordButtonState(filter==='ALL'?'':filter);
       alert(state.msg);
     },true);
     document.addEventListener('change',e=>{
@@ -4167,7 +4551,7 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
       db.collection('pondLocks').onSnapshot(s=>{pondLocks={};s.docs.forEach(d=>pondLocks[d.id]={id:d.id,...d.data()});saveLocal();renderLockStatus();refreshMobileRecordButtons();});
       db.collection('cropLocks').onSnapshot(s=>{cropLocks={};s.docs.forEach(d=>cropLocks[d.id]={id:d.id,...d.data()});saveLocal();renderLockStatus();refreshMobileRecordButtons();});
     }
-    installGuards(); installRecordButtonLockUI(); wrap('renderPondList',orig=>function(){const r=orig.apply(this,arguments);setTimeout(()=>{decoratePondCards();refreshMobileRecordButtons();},0);return r;}); setTimeout(()=>{renderLockStatus();decoratePondCards();refreshMobileRecordButtons();reconcileExisting();},900);
+    installGuards(); installRecordButtonLockUI(); installEntryEditModalLocks(); wrap('renderPondList',orig=>function(){const r=orig.apply(this,arguments);setTimeout(()=>{decoratePondCards();refreshMobileRecordButtons();},0);return r;}); setTimeout(()=>{renderLockStatus();decoratePondCards();refreshMobileRecordButtons();reconcileExisting();},900);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
 })();
