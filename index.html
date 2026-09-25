@@ -622,7 +622,7 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                                    autocomplete="off"
                                    onfocus="openTreatmentDropdown()"
                                    onclick="openTreatmentDropdown()"
-                                   oninput="filterTreatmentOptions(this.value)">
+                                   oninput="selectedTreatmentProductId = null; filterTreatmentOptions(this.value)">
                             <span class="absolute right-2 text-slate-400 pointer-events-none text-[10px]">▼</span>
                         </div>
                         <div id="treatmentOptionsList" class="dropdown-scroll-list absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-2xl z-50 hidden divide-y divide-slate-100">
@@ -635,7 +635,7 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                             <input type="number" step="0.01" id="treatmentQty" placeholder="e.g. 5 or 0.5" required class="w-full border border-slate-200 p-2.5 sm:p-2 rounded text-sm sm:text-xs bg-white outline-none focus:ring-1 focus:ring-blue-500 font-bold text-slate-800 pr-16">
                             <span id="treatmentUnitBadge" class="absolute right-2 px-2.5 py-1 bg-blue-50 text-blue-700 border border-blue-200 rounded text-xs font-black pointer-events-none">Kg</span>
                         </div>
-                        <p class="text-[10px] text-slate-400 mt-1">Base unit auto-detected (Kg / Ltr) for clean inventory reconciliation.</p>
+                        <p class="text-[10px] text-slate-400 mt-1">Product Master base unit (Kg / Ltr) for clean inventory reconciliation.</p>
                     </div>
 
                     <div>
@@ -902,7 +902,7 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                                            autocomplete="off"
                                            onfocus="openSuppDropdown()"
                                            onclick="openSuppDropdown()"
-                                           oninput="filterSuppOptions(this.value)">
+                                           oninput="selectedSupplementProductId = null; filterSuppOptions(this.value)">
                                     <span class="absolute right-2 text-slate-400 pointer-events-none text-[10px]">▼</span>
                                 </div>
                                 <div id="suppOptionsList" class="dropdown-scroll-list absolute left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-lg shadow-2xl z-50 hidden divide-y divide-slate-100">
@@ -1184,6 +1184,13 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
             { code: 'Kemin Aquaratio-1Kg', name: 'Kemin Aquaratio-1Kg' }
         ];
 
+        // Mobile reads the Laptop-owned Product Master.  It never writes this
+        // document; new operational records are validated against this cache.
+        let mobileProductMaster = [];
+        let mobileProductMasterLoaded = false;
+        let selectedTreatmentProductId = null;
+        let selectedSupplementProductId = null;
+
         const availableFeedCodes = [
             { code: 'Feed 1C', name: 'Feed 1C' },
             { code: 'Feed 2C', name: 'Feed 2C' },
@@ -1333,6 +1340,60 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
             return 'Kg';
         }
 
+        function normalizeMobileProductMaster(data) {
+            const items = Array.isArray(data?.items) ? data.items : (Array.isArray(data) ? data : []);
+            return items.map(item => ({
+                productId: item?.productId != null ? String(item.productId) : '',
+                name: String(item?.name || '').trim(),
+                company: item?.company || '',
+                category: item?.category || '',
+                unit: item?.unit || '',
+                packSize: item?.packSize,
+                stockUnit: item?.stockUnit || '',
+                useInPondTreatment: item?.useInPondTreatment === true,
+                useInSupplement: item?.useInSupplement === true
+            })).filter(item => item.name);
+        }
+
+        function mobileProductMasterUnavailableMessage() {
+            return 'Product Master unavailable. Please reconnect and try again.';
+        }
+
+        function treatmentCategoryMatchesMaster(category, product) {
+            if (!product?.useInPondTreatment) return false;
+            if (category === 'Fertilizers') return product.category === 'Fertilizer' || product.category === 'Mineral';
+            return product.category === category;
+        }
+
+        function treatmentMasterProducts(category) {
+            return mobileProductMaster.filter(product => treatmentCategoryMatchesMaster(category, product));
+        }
+
+        function supplementMasterProducts() {
+            return mobileProductMaster.filter(product => product.useInSupplement === true);
+        }
+
+        function resolveMobileMasterProduct(productId, name) {
+            if (!mobileProductMasterLoaded) return { product: null, error: mobileProductMasterUnavailableMessage() };
+            const id = String(productId || '').trim();
+            if (id) {
+                const byId = mobileProductMaster.filter(product => product.productId === id);
+                if (byId.length === 1) return { product: byId[0], error: null };
+                return { product: null, error: 'Selected Product Master product is no longer available.' };
+            }
+            const exactName = String(name || '').trim();
+            const byName = mobileProductMaster.filter(product => product.name === exactName);
+            if (byName.length === 1) return { product: byName[0], error: null };
+            return { product: null, error: byName.length ? 'Product Master product is ambiguous. Please select it again.' : 'Please select a Product Master product.' };
+        }
+
+        function setTreatmentUnitBadge(unit) {
+            const badge = document.getElementById('treatmentUnitBadge');
+            if (!badge) return;
+            badge.innerText = unit;
+            badge.className = `absolute right-2 px-2.5 py-1 rounded text-xs font-black pointer-events-none border ${unit === 'Ltr' ? 'bg-cyan-50 text-cyan-700 border-cyan-200' : 'bg-blue-50 text-blue-700 border border-blue-200'}`;
+        }
+
         function initRealtimeSync() {
             const statusEl = document.getElementById('syncStatusBadge');
 
@@ -1350,6 +1411,16 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
             if (statusEl) {
                 statusEl.innerHTML = `<span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Cloud Sync`;
             }
+
+            db.collection('farmBackup').doc('masterCatalogue').onSnapshot(doc => {
+                mobileProductMaster = normalizeMobileProductMaster(doc.exists ? doc.data() : null);
+                mobileProductMasterLoaded = doc.exists;
+                if (!mobileProductMasterLoaded) console.warn('Mobile Product Master document is unavailable.');
+            }, err => {
+                mobileProductMaster = [];
+                mobileProductMasterLoaded = false;
+                console.error('Mobile Product Master sync error:', err);
+            });
 
             db.collection('farmCycles').onSnapshot(snap => {
                 if (!snap.empty) {
@@ -3073,6 +3144,15 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                 const suppCode = document.getElementById('singleSuppCode').value;
                 const suppDose = parseFloat(document.getElementById('singleSuppDose').value) || 0;
                 if (suppCode && suppDose > 0) {
+                    const resolution = resolveMobileMasterProduct(selectedSupplementProductId, suppCode);
+                    if (!resolution.product) {
+                        alert(resolution.error);
+                        return;
+                    }
+                    if (!resolution.product.useInSupplement) {
+                        alert('Product is no longer enabled for Feed Supplement.');
+                        return;
+                    }
                     supplement = { code: suppCode, dose: suppDose, qty: totalQty * suppDose };
                 }
             }
@@ -3187,9 +3267,24 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
             const category = document.querySelector('input[name="treatmentCategory"]:checked')?.value || 'Probiotics';
             const product = document.getElementById('treatmentProduct').value.trim();
             const qty = parseFloat(document.getElementById('treatmentQty').value) || 0;
-            const unit = determineUnit(product);
             const purpose = document.getElementById('treatmentPurpose').value;
             const notes = document.getElementById('treatmentNotes').value.trim();
+
+            const resolution = resolveMobileMasterProduct(selectedTreatmentProductId, product);
+            if (!resolution.product) {
+                alert(resolution.error);
+                return;
+            }
+            const masterProduct = resolution.product;
+            if (!treatmentCategoryMatchesMaster(category, masterProduct)) {
+                alert('Product is no longer enabled for this Pond Treatment category.');
+                return;
+            }
+            if (masterProduct.stockUnit !== 'Kg' && masterProduct.stockUnit !== 'Ltr') {
+                alert(`Product Master unit for ${masterProduct.name} must be Kg or Ltr.`);
+                return;
+            }
+            const unit = masterProduct.stockUnit;
 
             const c = getActiveCycle();
             const activePonds = getActivePonds();
@@ -3198,7 +3293,8 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                 return;
             }
             const id = editingTreatmentId !== null ? editingTreatmentId : Date.now();
-            const treatObj = { id, date, pond, category, product, qty, unit, purpose, notes, year: Number(c.year), crop: c.crop, cycleId: c.id };
+            const treatObj = { id, date, pond, category, product: masterProduct.name, qty, unit, purpose, notes, year: Number(c.year), crop: c.crop, cycleId: c.id };
+            if (masterProduct.productId) treatObj.productId = masterProduct.productId;
 
             try {
                 await saveTreatmentToDb(treatObj);
@@ -3573,7 +3669,8 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
             });
             if (!preserveValue) {
                 document.getElementById('treatmentProduct').value = '';
-                document.getElementById('treatmentUnitBadge').innerText = 'Kg';
+                selectedTreatmentProductId = null;
+                setTreatmentUnitBadge('Kg');
             }
             const listEl = document.getElementById('treatmentOptionsList');
             if (listEl && !listEl.classList.contains('hidden')) filterTreatmentOptions('');
@@ -3588,25 +3685,30 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
         function filterTreatmentOptions(q) {
             const listEl = document.getElementById('treatmentOptionsList');
             const cat = document.querySelector('input[name="treatmentCategory"]:checked')?.value || 'Probiotics';
-            const matches = (treatmentCatalog[cat] || []).filter(item => item.toLowerCase().includes((q || '').toLowerCase().trim()));
             listEl.innerHTML = '';
+            if (!mobileProductMasterLoaded) {
+                listEl.innerHTML = `<div class="p-3 text-rose-500 text-center text-xs">${mobileProductMasterUnavailableMessage()}</div>`;
+                listEl.classList.remove('hidden');
+                return;
+            }
+            const query = (q || '').toLowerCase().trim();
+            const matches = treatmentMasterProducts(cat).filter(item =>
+                item.name.toLowerCase().includes(query) || String(item.company || '').toLowerCase().includes(query)
+            );
             if (!matches.length) {
                 listEl.innerHTML = `<div class="p-3 text-slate-400 text-center text-xs">No ${cat} products found</div>`;
             } else {
                 matches.forEach(item => {
-                    const unit = determineUnit(item);
+                    const unit = item.stockUnit;
                     const opt = document.createElement('div');
                     opt.className = 'p-3 hover:bg-blue-50 active:bg-blue-100 cursor-pointer flex justify-between items-center transition border-b border-slate-50 last:border-0 select-none';
-                    opt.innerHTML = `<div class="font-bold text-slate-700 text-sm sm:text-xs">${item}</div><span class="text-[10px] font-extrabold px-2 py-0.5 rounded ${unit === 'Ltr' ? 'bg-cyan-50 text-cyan-700 border border-cyan-200' : 'bg-blue-50 text-blue-700 border border-blue-200'}">${unit}</span>`;
+                    opt.innerHTML = `<div class="font-bold text-slate-700 text-sm sm:text-xs">${item.name}</div><span class="text-[10px] font-extrabold px-2 py-0.5 rounded ${unit === 'Ltr' ? 'bg-cyan-50 text-cyan-700 border border-cyan-200' : 'bg-blue-50 text-blue-700 border border-blue-200'}">${unit}</span>`;
                     opt.onclick = (e) => {
                         e.preventDefault(); e.stopPropagation();
-                        document.getElementById('treatmentProduct').value = item;
+                        document.getElementById('treatmentProduct').value = item.name;
+                        selectedTreatmentProductId = item.productId || null;
                         listEl.classList.add('hidden');
-                        const badge = document.getElementById('treatmentUnitBadge');
-                        if (badge) {
-                            badge.innerText = unit;
-                            badge.className = `absolute right-2 px-2.5 py-1 rounded text-xs font-black pointer-events-none border ${unit === 'Ltr' ? 'bg-cyan-50 text-cyan-700 border-cyan-200' : 'bg-blue-50 text-blue-700 border border-blue-200'}`;
-                        }
+                        setTreatmentUnitBadge(unit);
                         document.getElementById('treatmentQty').focus();
                     };
                     listEl.appendChild(opt);
@@ -3635,6 +3737,7 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                     document.getElementById('treatmentPond').value = treat.pond;
                     selectTreatmentCategory(treat.category || 'Probiotics', true);
                     document.getElementById('treatmentProduct').value = treat.product;
+                    selectedTreatmentProductId = treat.productId || null;
                     const unit = treat.unit || determineUnit(treat.product);
                     const badge = document.getElementById('treatmentUnitBadge');
                     if (badge) badge.innerText = unit;
@@ -3647,9 +3750,10 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                 modalTitle.innerText = "Add Pond Treatment";
                 submitBtn.innerText = "Save Treatment";
                 document.getElementById('treatmentForm').reset();
+                selectedTreatmentProductId = null;
                 document.getElementById('treatmentDate').value = getSystemLatestDate();
                 selectTreatmentCategory('Probiotics', false);
-                document.getElementById('treatmentUnitBadge').innerText = 'Kg';
+                setTreatmentUnitBadge('Kg');
                 if (ponds.length > 0) document.getElementById('treatmentPond').value = currentPond || ponds[0].id;
             }
         }
@@ -3830,10 +3934,12 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                             document.getElementById('singleSuppCode').value = entry.supplement.code;
                             document.getElementById('singleSuppSearchInput').value = entry.supplement.code;
                             document.getElementById('singleSuppDose').value = entry.supplement.dose || '';
+                            selectedSupplementProductId = entry.supplement.productId || null;
                         } else {
                             document.getElementById('singleSuppCode').value = '';
                             document.getElementById('singleSuppSearchInput').value = '';
                             document.getElementById('singleSuppDose').value = '';
+                            selectedSupplementProductId = null;
                         }
                         updateSupplementCalculations();
                     }
@@ -3858,6 +3964,7 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                 document.getElementById('singleSuppSearchInput').value = '';
                 document.getElementById('singleSuppDose').value = '';
                 document.getElementById('singleSuppCalcQty').value = '';
+                selectedSupplementProductId = null;
                 document.getElementById('notes').value = '';
                 document.querySelector('input[name="fasting"][value="No"]').checked = true;
                 toggleFasting(false);
@@ -3919,14 +4026,22 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
         function filterSuppOptions(query) {
             const listEl = document.getElementById('suppOptionsList');
             const q = (query || '').toLowerCase().trim();
-            const matches = availableSupplements.filter(s => s.code.toLowerCase().includes(q) || s.name.toLowerCase().includes(q));
             listEl.innerHTML = '';
+            if (!mobileProductMasterLoaded) {
+                listEl.innerHTML = `<div class="p-3 text-rose-500 text-center text-xs">${mobileProductMasterUnavailableMessage()}</div>`;
+                listEl.classList.remove('hidden');
+                return;
+            }
+            const matches = supplementMasterProducts().filter(s =>
+                s.name.toLowerCase().includes(q) || String(s.company || '').toLowerCase().includes(q)
+            );
             const clearOpt = document.createElement('div');
             clearOpt.className = 'p-3 hover:bg-amber-100/60 active:bg-amber-100 cursor-pointer text-slate-400 italic text-xs border-b border-slate-100 select-none';
             clearOpt.innerHTML = '<span>🚫</span> No Supplement (Clear)';
             clearOpt.onclick = (e) => {
                 e.preventDefault(); e.stopPropagation();
                 document.getElementById('singleSuppCode').value = '';
+                selectedSupplementProductId = null;
                 document.getElementById('singleSuppSearchInput').value = '';
                 document.getElementById('singleSuppDose').value = '';
                 document.getElementById('singleSuppCalcQty').value = '';
@@ -3941,8 +4056,9 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                 opt.innerHTML = `<div class="font-bold text-slate-700 text-sm sm:text-xs">${item.name}</div>`;
                 opt.onclick = (e) => {
                     e.preventDefault(); e.stopPropagation();
-                    document.getElementById('singleSuppCode').value = item.code;
+                    document.getElementById('singleSuppCode').value = item.name;
                     document.getElementById('singleSuppSearchInput').value = item.name;
+                    selectedSupplementProductId = item.productId || null;
                     listEl.classList.add('hidden');
                     document.getElementById('supplementProductsSection').style.zIndex = '10';
                     document.getElementById('singleSuppDose').focus();
@@ -4212,7 +4328,23 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
     const py=Number(p?.year||p?.cropYear||0), pc=String(p?.crop||p?.cropCycle||'').trim();
     return canonicalCycleId(py&&pc&&typeof cycleIdFor==='function' ? cycleIdFor(py,pc) : p?.cycleId||'');
   }
-  function isPondClosed(pid,cid){ return !!pondLocks[pkey(cid,pid)]?.closed; }
+  // Use the shared pond master to resolve a reference to its logical pond
+  // identity. Mobile already normalizes internal legacy IDs to P1/P2/etc.
+  function resolveLockPondSubject(pondRef,cid){
+    const ref=String(pondRef??'').trim(), cc=canonicalCycleId(cid);
+    if(!ref) return '';
+    const arr=typeof ponds!=='undefined'&&Array.isArray(ponds)?ponds:[];
+    const p=arr.find(x=>pondCycleId(x)===cc && (canonicalPondId(x?.id)===canonicalPondId(ref)||canonicalPondId(x?.name||x?.pondName)===canonicalPondId(ref)));
+    return logicalPondIdFromRef(p?.id||p?.name||ref);
+  }
+  function lockBusinessKey(cid,pid){ return pkey(canonicalCycleId(cid),resolveLockPondSubject(pid,cid)); }
+  function effectivePondLock(cid,pid){
+    const cc=canonicalCycleId(cid), businessKey=lockBusinessKey(cc,pid);
+    if(Object.prototype.hasOwnProperty.call(pondLocks,businessKey)) return pondLocks[businessKey] || null;
+    const legacyKey=pkey(cc,pid);
+    return legacyKey!==businessKey && Object.prototype.hasOwnProperty.call(pondLocks,legacyKey) ? pondLocks[legacyKey] || null : null;
+  }
+  function isPondClosed(pid,cid){ return effectivePondLock(cid,pid)?.closed===true; }
   function isCropClosed(cid){ return !!cropLocks[String(cid)]?.closed; }
   function saveLocal(){ localStorage.setItem('bc_pondLocks',JSON.stringify(pondLocks)); localStorage.setItem('bc_cropLocks',JSON.stringify(cropLocks)); }
   function deny(msg){ alert(msg); return false; }
@@ -4255,8 +4387,8 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
     await db.collection('lockAudit').doc(`${Date.now()}_${Math.random().toString(36).slice(2,8)}`).set({action,scope:r.pondId?'pond':'crop',cycleId:r.cycleId,year:Number(r.year),crop:r.crop,pondId:r.pondId||null,pondName:r.pondName||null,reason,device:DEVICE,timestamp:todayIso()});
   }
   async function closePond(p,reason){
-    const cid=canonicalCycleId(p.cycleId || cycleOf(p)); const key=pkey(cid,p.id);
-    const rec={closed:true,cycleId:cid,year:Number(p.year||p.cropYear||activeC().year),crop:p.crop||p.cropCycle||activeC().crop,pondId:p.id,pondName:p.name||p.id,closedAt:todayIso(),closedBy:DEVICE,reason:reason||'Full/Final harvest recorded'};
+    const cid=canonicalCycleId(p.cycleId || cycleOf(p)), subject=resolveLockPondSubject(p.id||p.name,cid), key=lockBusinessKey(cid,subject);
+    const rec={closed:true,cycleId:cid,year:Number(p.year||p.cropYear||activeC().year),crop:p.crop||p.cropCycle||activeC().crop,pondId:subject,pondName:p.name||subject,closedAt:todayIso(),closedBy:DEVICE,reason:reason||'Full/Final harvest recorded'};
     pondLocks[key]=rec; saveLocal(); await cloudSet('pondLocks',key,rec);
   }
   async function closeCrop(c,reason){
@@ -4268,7 +4400,7 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
     const context=getPondForHarvestLock(h);
     if(!context){ console.warn('Full/Final Harvest lock reconciliation skipped: exact Pond/Crop linkage could not be resolved', h); return; }
     const p=context.pond, cid=context.cycleId;
-    const existingLock=pondLocks[pkey(cid,p.id)];
+    const existingLock=effectivePondLock(cid,p.id);
     if(opts.mode==='reconcile' && hasExplicitReactivation(existingLock)){
       renderLockStatus(); refreshMobileRecordButtons(); return;
     }
@@ -4347,7 +4479,7 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
     const reason=prompt(`Mandatory reason for reactivating ${p.name||p.id}:`,'');
     if(!reason||!reason.trim()){alert('A reason is mandatory.');return;}
     try{
-      const key=pkey(cid,p.id),rec={...pondLocks[key],closed:false,reactivatedAt:todayIso(),reactivatedBy:DEVICE,reactivationReason:reason.trim()};
+      const subject=resolveLockPondSubject(p.id||p.name,cid),key=lockBusinessKey(cid,subject),rec={...effectivePondLock(cid,p.id),closed:false,cycleId:cid,pondId:subject,pondName:p.name||subject,reactivatedAt:todayIso(),reactivatedBy:DEVICE,reactivationReason:reason.trim()};
       pondLocks[key]=rec;saveLocal();await cloudSet('pondLocks',key,rec);
       await writeAudit('POND_REACTIVATED',{...c,cycleId:cid,pondId:p.id,pondName:p.name,year:p.year||c.year,crop:p.crop||c.crop},reason.trim());
       renderLockStatus();
