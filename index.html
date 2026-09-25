@@ -1006,6 +1006,7 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
             document.body.classList.add("view-only-mode");
             authScreen.classList.add('hidden');
             mainApp.classList.remove('hidden');
+            applyViewOnlyRestrictions();
             requestAnimationFrame(() => { syncAppLayout(); setTimeout(syncAppLayout, 100); });
             ensureActiveMobileCycle();
             populateMobileCycleSelectors();
@@ -1019,15 +1020,34 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
             if (!isViewOnlyMode) return;
             document.body.classList.add("view-only-mode");
             document.querySelectorAll('form').forEach(form => {
-                form.addEventListener('submit', function(e) { e.preventDefault(); e.stopImmediatePropagation(); alert('View-Only mode: data changes are disabled.'); }, true);
+                if (form.dataset.viewOnlySubmitBlocker === "1") return;
+                form.dataset.viewOnlySubmitBlocker = "1";
+                form.addEventListener('submit', function(e) {
+                    if (!isViewOnlyMode) return;
+                    e.preventDefault(); e.stopImmediatePropagation(); alert('View-Only mode: data changes are disabled.');
+                }, true);
             });
             document.querySelectorAll('button').forEach(btn => {
                 const text = (btn.innerText || btn.textContent || '').trim().toLowerCase();
                 const onclick = (btn.getAttribute('onclick') || '').toLowerCase();
                 if (/\b(add|save|delete|edit|update|submit|remove|mix second feed)\b/.test(text) || /\b(delete|save|submit|handleformsubmit|handlesamplingsubmit|handletreatmentsubmit|handleharvestsubmit|handlepondsubmit)\b/.test(onclick)) {
+                    if (btn.dataset.viewOnlyDisabled !== "1") {
+                        btn.dataset.viewOnlyDisabled = "1";
+                        btn.dataset.viewOnlyDisplay = btn.style.display;
+                    }
                     btn.disabled = true;
                     btn.style.display = 'none';
                 }
+            });
+        }
+
+        function removeViewOnlyRestrictions() {
+            document.body.classList.remove("view-only-mode");
+            document.querySelectorAll('[data-view-only-disabled="1"]').forEach(btn => {
+                btn.disabled = false;
+                btn.style.display = btn.dataset.viewOnlyDisplay || '';
+                delete btn.dataset.viewOnlyDisabled;
+                delete btn.dataset.viewOnlyDisplay;
             });
         }
 
@@ -1045,9 +1065,10 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
                 }
 
                 try {
+                    await firebase.auth().signInWithEmailAndPassword(FIXED_USER_EMAIL, pin);
                     isViewOnlyMode = false;
                     sessionStorage.removeItem("bc_view_only_mode");
-                    await firebase.auth().signInWithEmailAndPassword(FIXED_USER_EMAIL, pin);
+                    removeViewOnlyRestrictions();
                     authStatus.textContent = "";
                     pinInput.value = "";
                 } catch (err) {
@@ -4594,4 +4615,8 @@ input:focus,select:focus,textarea:focus{border-color:#4d91b8!important;box-shado
       db.collection('pondLocks').onSnapshot(s=>{pondLocks={};s.docs.forEach(d=>pondLocks[d.id]={id:d.id,...d.data()});saveLocal();initialPondLocksSnapshotReady=true;maybeReconcileInitialHarvestLocks();renderLockStatus();refreshMobileRecordButtons();});
       db.collection('cropLocks').onSnapshot(s=>{cropLocks={};s.docs.forEach(d=>cropLocks[d.id]={id:d.id,...d.data()});saveLocal();renderLockStatus();refreshMobileRecordButtons();});
     }
-    installGuards(); installRecordButtonLockUI(); installEntryEditModalLocks(); wrap('renderPondList',orig=>function(){const r=orig.apply(this,arguments);setTimeout(()=>{decoratePondCards();refreshMobileRecordButtons();},0);return r;
+    installGuards(); installRecordButtonLockUI(); installEntryEditModalLocks(); wrap('renderPondList',orig=>function(){const r=orig.apply(this,arguments);setTimeout(()=>{decoratePondCards();refreshMobileRecordButtons();},0);return r;}); setTimeout(()=>{renderLockStatus();decoratePondCards();refreshMobileRecordButtons();},900);
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init);else init();
+})();
+</script>
